@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'signal_processing'
 
@@ -10,6 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), 
+        glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'signal_generator = signal_processing.signal_generator:main'
+            'signal_generator = signal_processing.signal_generator:main',
+            'signal_processor = signal_processing.signal_processor:main'
         ],
     },
 )

@@ -4,44 +4,72 @@ from std_msgs.msg import Float32
 import math
 import time
 
-class SignalPublisher(Node):
+class SignalGeneratorNode(Node):
     
     def __init__(self):
         
-        super().__init__('signal_publisher')
-        self.publisher_ = self.create_publisher(Float32, 'signal', 10)
+        super().__init__('signal_generator')
+
+        # Publishers for signal and time
+
+        self.signal_publisher = self.create_publisher(
+            Float32, 
+            '/signal',
+            10
+        )
+
+        self.time_publisher = self.create_publisher(
+            Float32,
+            '/time',
+            10
+        )
+
+        # Create timer for publishing at 10Hz
 
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.angle = 0.0
+
+        # Initialize time counter
+
+        self.t = 0.0
+
+        self.get_logger().info('Signal Generator Node has been started')
 
     def timer_callback(self):
 
-        signal_value = math.sin(self.angle)
+        # Create message objects
 
-        msg = Float32()
-        msg.data = signal_value
+        signal_msg = Float32()
+        time_msg = Float32()
 
-        self.publisher_.publish(msg)
+        # Calculate sine wave
 
-        self.angle += 0.1
+        signal_msg.data = float(math.sin(self.t))
+        time_msg.data = float(self.t)
 
-        if self.angle > 2 * math.pi:
-            self.angle = 0.0
+        # Publish messsages
 
-        
-        self.get_logger().info(f'Publishing: {signal_value}')
+        self.signal_publisher.publish(signal_msg)
+        self.time_publisher.publish(time_msg)
+
+        # Log the values
+
+        self.get_logger().info(f'Time: {self.t:.2f}, Signal: {signal_msg.data:.2f}')
+
+        # Increment time
+
+        self.t += 0.1
 
 def main(args=None):
 
     rclpy.init(args=args)
-    node = SignalPublisher()
+    signal_generator = SignalGeneratorNode()
 
     try:
-        rclpy.spin(node)
+        rclpy.spin(signal_generator)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        signal_generator.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':

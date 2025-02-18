@@ -1,0 +1,5 @@
+  File "/shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing/signal_generator.py", line 18
+    10
+    ^^
+SyntaxError: invalid syntax
+

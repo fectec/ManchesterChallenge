@@ -1,0 +1,27 @@
+[0.717s] Invoking command in '/shared-folder/ManchesterChallenges/ros2_ws/src/signal_processing': PYTHONPATH=/shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/signal_processing build --build-base /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build install --record /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/install.log --single-version-externally-managed install_data
+[0.961s] running egg_info
+[0.962s] writing ../../build/signal_processing/signal_processing.egg-info/PKG-INFO
+[0.962s] writing dependency_links to ../../build/signal_processing/signal_processing.egg-info/dependency_links.txt
+[0.962s] writing entry points to ../../build/signal_processing/signal_processing.egg-info/entry_points.txt
+[0.963s] writing requirements to ../../build/signal_processing/signal_processing.egg-info/requires.txt
+[0.963s] writing top-level names to ../../build/signal_processing/signal_processing.egg-info/top_level.txt
+[0.965s] reading manifest file '../../build/signal_processing/signal_processing.egg-info/SOURCES.txt'
+[0.966s] writing manifest file '../../build/signal_processing/signal_processing.egg-info/SOURCES.txt'
+[0.966s] running build
+[0.966s] running build_py
+[0.967s] copying signal_processing/signal_processor.py -> /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build/lib/signal_processing
+[0.967s] copying signal_processing/signal_generator.py -> /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build/lib/signal_processing
+[0.967s] running install
+[0.967s] running install_lib
+[0.969s] copying /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build/lib/signal_processing/signal_processor.py -> /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing
+[0.969s] copying /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build/lib/signal_processing/signal_generator.py -> /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing
+[0.970s] byte-compiling /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing/signal_processor.py to signal_processor.cpython-310.pyc
+[0.971s] byte-compiling /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing/signal_generator.py to signal_generator.cpython-310.pyc
+[0.971s] running install_data
+[0.972s] running install_egg_info
+[0.976s] removing '/shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing-0.0.0-py3.10.egg-info' (and everything under it)
+[0.976s] Copying ../../build/signal_processing/signal_processing.egg-info to /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing-0.0.0-py3.10.egg-info
+[0.977s] running install_scripts
+[1.006s] Installing signal_generator script to /shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/signal_processing
+[1.007s] writing list of installed files to '/shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/install.log'
+[1.047s] Invoked command in '/shared-folder/ManchesterChallenges/ros2_ws/src/signal_processing' returned '0': PYTHONPATH=/shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/signal_processing build --build-base /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/build install --record /shared-folder/ManchesterChallenges/ros2_ws/build/signal_processing/install.log --single-version-externally-managed install_data

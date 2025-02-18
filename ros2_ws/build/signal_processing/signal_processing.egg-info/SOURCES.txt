@@ -8,9 +8,11 @@ setup.py
 ../../build/signal_processing/signal_processing.egg-info/requires.txt
 ../../build/signal_processing/signal_processing.egg-info/top_level.txt
 ../../build/signal_processing/signal_processing.egg-info/zip-safe
+launch/challenge1_launch.py
 resource/signal_processing
 signal_processing/__init__.py
 signal_processing/signal_generator.py
+signal_processing/signal_processor.py
 test/test_copyright.py
 test/test_flake8.py
 test/test_pep257.py

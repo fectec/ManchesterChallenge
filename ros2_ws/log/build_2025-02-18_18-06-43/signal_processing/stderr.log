@@ -1,0 +1,5 @@
+  File "/shared-folder/ManchesterChallenges/ros2_ws/install/signal_processing/lib/python3.10/site-packages/signal_processing/signal_generator.py", line 56
+    self.get_logger().info(f'Time': {self.t:.2f}, Signal: {signal_msg.data:.2f})
+                                             ^
+SyntaxError: invalid decimal literal
+
