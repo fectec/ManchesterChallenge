@@ -1,0 +1,3 @@
+[console_scripts]
+signal_generator = signal_processing.signal_generator:main
+
