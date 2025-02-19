@@ -11,9 +11,9 @@ class SignalProcessorNode(Node):
 
         # Parameters for signal processing
 
-        self.alpha = 1.0
+        self.alpha = 0.5
         self.amplitude_reduction = 0.5
-        self.phase_shift = math.pi/4
+        self.phase_shift = math.pi
 
         # Last received values
 
@@ -67,9 +67,9 @@ class SignalProcessorNode(Node):
         if self.current_time is None or self.current_signal is None:
             return
 
-        # We reconstruct the signal using the current time
+        # Modify the signal
 
-        processed_signal = self.amplitude_reduction * math.sin(self.current_time + self.phase_shift) + self.alpha
+        processed_signal = self.amplitude_reduction * (self.current_signal * math.cos(self.phase_shift) + math.cos(math.asin(self.current_signal)) * math.sin(self.phase_shift)) + self.alpha
 
         # Create and publish message
 
