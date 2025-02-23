@@ -25,7 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'dc_motor = motor_control.dc_motor:main',
-            'setpoint = motor_control.setpoint:main'
+            'setpoint = motor_control.setpoint:main',
+            'controller = motor_control.controller:main'
         ],
     },
 )
