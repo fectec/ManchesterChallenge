@@ -24,14 +24,14 @@ class SignalProcessorNode(Node):
 
         self.time_subscriber = self.create_subscription(
             Float32,
-            '/time',
+            'time',
             self.time_callback,
             10
         )
 
         self.signal_subscriber = self.create_subscription(
             Float32,
-            '/signal',
+            'signal',
             self.signal_callback,
             10
         )
@@ -40,7 +40,7 @@ class SignalProcessorNode(Node):
 
         self.processed_publisher = self.create_publisher(
             Float32,
-            '/proc_signal',
+            'proc_signal',
             10
         )
 

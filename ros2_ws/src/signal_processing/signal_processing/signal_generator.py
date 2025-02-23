@@ -14,13 +14,13 @@ class SignalGeneratorNode(Node):
 
         self.signal_publisher = self.create_publisher(
             Float32, 
-            '/signal',
+            'signal',
             10
         )
 
         self.time_publisher = self.create_publisher(
             Float32,
-            '/time',
+            'time',
             10
         )
 
