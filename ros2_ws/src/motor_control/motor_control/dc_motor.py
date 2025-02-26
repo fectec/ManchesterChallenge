@@ -7,107 +7,94 @@ from rcl_interfaces.msg import SetParametersResult
 
 class DCMotorNode(Node):
     def __init__(self):
-        super().__init__("dc_motor")
+        super().__init__("DCMotor")
 
-        # Parameters
-        # System sample time in seconds
-        self.declare_parameter("sys_sample_time", 1.0)
-        
-        # System gain K
-        self.declare_parameter("sys_gain_K", 1.0)
+        # Declare parameters
+        self.declare_parameter("sample_time", 1.0)         # System sample time in seconds
+        self.declare_parameter("gain_K", 1.0)              # System gain K
+        self.declare_parameter("tau_T", 1.0)               # System time constant Tau
+        self.declare_parameter("initial_conditions", 1.0)  # System initial conditions
 
-        # System time constant Tau
-        self.declare_parameter("sys_tau_T", 1.0)
+        # Get parameters as variables
+        self.sample_time = self.get_parameter("sample_time").value
+        self.gain_K = self.get_parameter("gain_K").value
+        self.tau_T = self.get_parameter("tau_T").value
+        self.initial_conditions = self.get_parameter("initial_conditions").value
 
-        # System initial conditions
-        self.declare_parameter("sys_initial_conditions", 1.0)
+        # Variables for simulation state
+        self.motor_input_u = 0.0
+        self.motor_output_y = self.initial_conditions
 
-        # Parameters as variables
-        self.sample_time = self.get_parameter("sys_sample_time").value
-        self.gain = self.get_parameter("sys_gain_K").value
-        self.time_constant = self.get_parameter("sys_tau_T").value
-        self.initial_conditions = self.get_parameter("sys_initial_conditions").value
-
-        # Variables
-        self.input_u = 0.0
-        self.output_y = self.initial_conditions
-        
-        # Subscribers, publishers & timers
+        # Subscribers, publishers, and timers
         self.motor_input_sub = self.create_subscription(
-            Float32, "motor_input_u", self.input_callback, 10
+            Float32, "motor_input_u", self.motor_input_callback, 10
         )
-        self.motor_speed_pub = self.create_publisher(Float32, "motor_output_y", 10)
+        self.motor_output_pub = self.create_publisher(Float32, "motor_output_y", 10)
         self.timer = self.create_timer(self.sample_time, self.timer_callback)
 
-        # Messages
+        # Message for publishing motor output
         self.motor_output_msg = Float32()
 
-        # Parameter callback
+        # Parameter callback for dynamic parameter updates
         self.add_on_set_parameters_callback(self.parameter_callback)
 
-        # Node started
-        self.get_logger().info("Dynamical System Node Started \U0001F680")
+        # Node startup log
+        self.get_logger().info("Dynamical System Node Started 🚀")
 
-    # Timer callback
+    # Timer callback: Simulate the DC Motor dynamics
     def timer_callback(self):
-        # DC Motor Simulation
-        # DC Motor Equation y[k+1] = y[k] + ((-1/τ) y[k] + (K/τ) u[k]) T_s
-        self.output_y += (
-            -1.0 / self.time_constant * self.output_y 
-            + self.gain / self.time_constant * self.input_u
+        # DC Motor simulation equation:
+        # y[k+1] = y[k] + ((-1/τ)*y[k] + (K/τ)*u[k]) * T_s
+        self.motor_output_y += (
+            -1.0 / self.tau_T * self.motor_output_y +
+            self.gain_K / self.tau_T * self.motor_input_u
         ) * self.sample_time
-        
-        # Publish the result
-        self.motor_output_msg.data = self.output_y
-        self.motor_speed_pub.publish(self.motor_output_msg)
 
-    # Subscriber callback
-    def input_callback(self, input_signal):
-        self.input_u = input_signal.data
+        # Publish the updated motor output
+        self.motor_output_msg.data = self.motor_output_y
+        self.motor_output_pub.publish(self.motor_output_msg)
 
-    # Parameter callback
+    # Subscriber callback: Update motor input
+    def motor_input_callback(self, msg):
+        self.motor_input_u = msg.data
+
+    # Parameter callback: Validate and apply dynamic parameter updates
     def parameter_callback(self, params):
         for param in params:
-            if param.name == "sys_sample_time":
-                if param.value < 0.0:
-                    self.get_logger().warn("Invalid value.")
+            if param.name == "sample_time":
+                # Ensure sample_time is greater than 0
+                if param.value <= 0.0:
+                    self.get_logger().warn("Invalid sample_time value.")
                     return SetParametersResult(
-                        successful=False, reason="Sample time cannot be negative."
+                        successful=False,
+                        reason="Sample time must be greater than 0."
                     )
                 else:
                     self.sample_time = param.value
                     self.get_logger().info(f"Sample time updated to {self.sample_time}.")
-            elif param.name == "sys_gain_K":
-                if param.value < 0.0:
-                    self.get_logger().warn("Invalid value.")
+                    # Restart the timer with the new sample_time
+                    self.timer.cancel()
+                    self.timer = self.create_timer(self.sample_time, self.timer_callback)
+            elif param.name == "tau_T":
+                # Ensure tau_T (time constant) is greater than 0
+                if param.value <= 0.0:
+                    self.get_logger().warn("Invalid tau_T value.")
                     return SetParametersResult(
-                        successful=False, reason="Gain cannot be negative."
+                        successful=False,
+                        reason="Time constant (tau_T) must be greater than 0."
                     )
                 else:
-                    self.gain = param.value
-                    self.get_logger().info(f"Gain updated to {self.gain}.")
-            elif param.name == "sys_tau_T":
-                if param.value < 0.0:
-                    self.get_logger().warn("Invalid value.")
-                    return SetParametersResult(
-                        successful=False, reason="Time constant cannot be negative."
-                    )
-                else:
-                    self.time_constant = param.value
-                    self.get_logger().info(f"Time constant updated to {self.time_constant}.")
-            elif param.name == "sys_initial_conditions":
-                if param.value < 0.0:
-                    self.get_logger().warn("Invalid value.")
-                    return SetParametersResult(
-                        successful=False, reason="Initial conditions cannot be negative."
-                    )
-                else:
-                    self.initial_conditions = param.value
-                    self.get_logger().info(f"Initial conditions updated to {self.initial_conditions}.")
-        
+                    self.tau_T = param.value
+                    self.get_logger().info(f"Time constant (tau_T) updated to {self.tau_T}.")
+            elif param.name == "gain_K":
+                self.gain_K = param.value
+                self.get_logger().info(f"System gain (gain_K) updated to {self.gain_K}.")
+            elif param.name == "initial_conditions":
+                self.initial_conditions = param.value
+                self.motor_output_y = self.initial_conditions
+                self.get_logger().info(f"Initial conditions updated to {self.initial_conditions} and motor output reset accordingly.")
         return SetParametersResult(successful=True)
 
-# Main
 def main(args=None):
     rclpy.init(args=args)
     node = DCMotorNode()
@@ -118,7 +105,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.try_shutdown()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
