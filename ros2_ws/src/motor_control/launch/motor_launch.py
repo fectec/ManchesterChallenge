@@ -36,9 +36,9 @@ def generate_launch_description():
         emulate_tty=True,
         output='screen',
         parameters=[{
-            'Kp': 0.1,
+            'Kp': 4.0,
             'Kd': 0.0,
-            'Ki': 0.0,
+            'Ki': 0.7,
             'sample_time': 0.01
         }]
     )
