@@ -66,18 +66,18 @@ class DCMotorNode(Node):
     def motor_input_callback(self, msg):
         self.motor_input_u = msg.data
 
-    # Service callback to start / stop simulation
+     # Service callback to start / stop simulation
     def enable_dynamic_system_node(self, request, response):
         if request.enable:
             self.simulation_running = True
-            self.get_logger().info("🚀 Dynamical System Simulation Started")
+            self.get_logger().info("🚀 Dynamic System Simulation Started")
             response.success = True
-            response.message = "Dynamical System Simulation Started Successfully"
+            response.message = "Dynamic System Simulation Started Successfully"
         else:
             self.simulation_running = False
-            self.get_logger().info("🚀 Dynamical System Simulation Stopped")
+            self.get_logger().info("🚀 Dynamic System Simulation Stopped")
             response.success = True
-            response.message = "Dynamical System Simulation Stopped Successfully"
+            response.message = "Dynamic System Simulation Stopped Successfully"
         
         return response
 
