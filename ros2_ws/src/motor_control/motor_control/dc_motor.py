@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
 from rcl_interfaces.msg import SetParametersResult
+from custom_interfaces.srv import SetProcessBool
 
 class DCMotorNode(Node):
     def __init__(self):
@@ -37,12 +38,19 @@ class DCMotorNode(Node):
 
         # Parameter callback for dynamic parameter updates
         self.add_on_set_parameters_callback(self.parameter_callback)
-        
+
+        # Set service callback
+        self.simulation_running = False
+        self.srv = self.create_service(SetProcessBool, 'EnableDynamicSystemNode', self.enable_dynamic_system_node)
+
         # Node startup log
         self.get_logger().info("Dynamical System Node Started 🚀")
 
     # Timer callback: Simulate the DC Motor dynamics
     def timer_callback(self):
+        if not self.simulation_running:
+            return
+
         # DC Motor simulation equation:
         # y[k+1] = y[k] + ((-1/τ)*y[k] + (K/τ)*u[k]) * T_s
         self.motor_output_y += (
@@ -57,6 +65,21 @@ class DCMotorNode(Node):
     # Subscriber callback: Update motor input
     def motor_input_callback(self, msg):
         self.motor_input_u = msg.data
+
+    # Service callback to start / stop simulation
+    def enable_dynamic_system_node(self, request, response):
+        if request.enable:
+            self.simulation_running = True
+            self.get_logger().info("🚀 Dynamical System Simulation Started")
+            response.success = True
+            response.message = "Dynamical System Simulation Started Successfully"
+        else:
+            self.simulation_running = False
+            self.get_logger().info("🚀 Dynamical System Simulation Stopped")
+            response.success = True
+            response.message = "Dynamical System Simulation Stopped Successfully"
+        
+        return response
 
     # Parameter callback: Validate and apply dynamic parameter updates
     def parameter_callback(self, params):

@@ -4,7 +4,10 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
 from rcl_interfaces.msg import SetParametersResult
+from custom_interfaces.srv import SetProcessBool
 import numpy as np
+
+# sistema_control_input
 
 class SetpointPublisherNode(Node):
 
@@ -34,11 +37,18 @@ class SetpointPublisherNode(Node):
         # Set up parameter callback for dynamic updates
         self.add_on_set_parameters_callback(self.parameter_callback)
 
+         # Set service callback
+        self.simulation_running = False
+        self.srv = self.create_service(SetProcessBool, 'EnableSetpointNode', self.enable_setpoint_node)
+
         # Node startup message
         self.get_logger().info("Setpoint Node Started 🚀")
 
     # Timer callback: generates and publishes the wave signal
     def timer_callback(self):
+        if not self.simulation_running:
+            return
+    
         # Calculate the elapsed time in seconds
         elapsed_time = (self.get_clock().now() - self.start_time).nanoseconds / 1e9
         
@@ -53,6 +63,21 @@ class SetpointPublisherNode(Node):
         
         # Publish the signal
         self.signal_publisher.publish(self.signal_msg)
+
+    # Service callback to start / stop simulation
+    def enable_setpoint_node(self, request, response):
+        if request.enable:
+            self.simulation_running = True
+            self.get_logger().info("🚀 Setpoint Simulation Started")
+            response.success = True
+            response.message = "Setpoint Simulation Started Successfully"
+        else:
+            self.simulation_running = False
+            self.get_logger().info("🚀 Setpoint Simulation Stopped")
+            response.success = True
+            response.message = "Setpoint Simulation Stopped Successfully"
+        
+        return response
 
     # Parameter callback: validates and applies dynamic parameter updates
     def parameter_callback(self, params):

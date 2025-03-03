@@ -46,6 +46,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         motor_node,
-        setpoint_node,
-        controller_node
+        controller_node,
+        setpoint_node
     ])
