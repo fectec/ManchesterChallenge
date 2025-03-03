@@ -111,7 +111,7 @@ class ControllerNode(Node):
             future = self.dynamic_system_cli.call_async(request)
             future.add_done_callback(self.enable_dynamic_system_node_callback)
         else:
-            self.get_logger().info("Setpoint Node is already enabled, skipping service call.")
+            self.get_logger().info("Dynamic System Node is already enabled, skipping service call.")
         
     def enable_setpoint_node_callback(self, future):
         try:
