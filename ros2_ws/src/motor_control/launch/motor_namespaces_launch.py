@@ -23,15 +23,18 @@ def generate_launch_description():
 
     group1_ns = "group_1"
     group2_ns = "group_2"
+    group3_ns = "group_2"
 
     package_directory = get_package_share_directory(package)
     launch_file_path = os.path.join(package_directory, "launch", launch_file)
 
     launch_source1 = PythonLaunchDescriptionSource(launch_file_path)
     launch_source2 = PythonLaunchDescriptionSource(launch_file_path)
+    launch_source3 = PythonLaunchDescriptionSource(launch_file_path)
 
     launch_1 = IncludeLaunchDescription(launch_source1)
     launch_2 = IncludeLaunchDescription(launch_source2)
+    launch_3 = IncludeLaunchDescription(launch_source3)
 
     motor_control_group1 = GroupAction(
         actions=[PushRosNamespace(group1_ns), launch_1]
@@ -41,8 +44,12 @@ def generate_launch_description():
         actions=[PushRosNamespace(group2_ns), launch_2]
     )
 
+    motor_control_group3 = GroupAction(
+        actions=[PushRosNamespace(group3_ns), launch_3]
+    )
+
     # LAUNCH THE DESCRIPTION
 
-    l_d = LaunchDescription([motor_control_group1, motor_control_group2])
+    l_d = LaunchDescription([motor_control_group1, motor_control_group2, motor_control_group3])
 
     return l_d

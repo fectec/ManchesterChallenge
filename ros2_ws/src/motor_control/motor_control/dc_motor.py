@@ -37,7 +37,7 @@ class DCMotorNode(Node):
 
         # Parameter callback for dynamic parameter updates
         self.add_on_set_parameters_callback(self.parameter_callback)
-
+        
         # Node startup log
         self.get_logger().info("Dynamical System Node Started 🚀")
 
@@ -62,7 +62,6 @@ class DCMotorNode(Node):
     def parameter_callback(self, params):
         for param in params:
             if param.name == "sample_time":
-                # Ensure sample_time is greater than 0
                 if param.value <= 0.0:
                     self.get_logger().warn("Invalid sample_time value.")
                     return SetParametersResult(
@@ -72,11 +71,9 @@ class DCMotorNode(Node):
                 else:
                     self.sample_time = param.value
                     self.get_logger().info(f"Sample time updated to {self.sample_time}.")
-                    # Restart the timer with the new sample_time
                     self.timer.cancel()
                     self.timer = self.create_timer(self.sample_time, self.timer_callback)
             elif param.name == "tau_T":
-                # Ensure tau_T (time constant) is greater than 0
                 if param.value <= 0.0:
                     self.get_logger().warn("Invalid tau_T value.")
                     return SetParametersResult(
@@ -102,7 +99,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("DC Motor Node shutting down gracefully.")
     finally:
         node.destroy_node()
         rclpy.shutdown()

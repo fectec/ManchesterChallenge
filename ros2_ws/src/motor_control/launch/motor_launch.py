@@ -12,7 +12,7 @@ def generate_launch_description():
             'sample_time': 0.01,
             'gain_K': 2.16,
             'tau_T': 0.05,
-            'initial_conditions': 0.0,
+            'initial_conditions': 0.0
         }]
     )
 
@@ -23,9 +23,10 @@ def generate_launch_description():
         emulate_tty=True,
         output='screen',
         parameters=[{
+            'timer_period': 0.01,
             'amplitude': 1.0,
             'omega': 1.0,
-            'timer_period': 0.01
+            'wave_type': "sine"
         }]
     )
 
@@ -36,10 +37,10 @@ def generate_launch_description():
         emulate_tty=True,
         output='screen',
         parameters=[{
+            'sample_time': 0.01,
             'Kp': 4.0,
             'Kd': 0.0,
-            'Ki': 0.7,
-            'sample_time': 0.01
+            'Ki': 0.7
         }]
     )
 
