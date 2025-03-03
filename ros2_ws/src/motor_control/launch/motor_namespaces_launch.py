@@ -23,7 +23,7 @@ def generate_launch_description():
 
     group1_ns = "group_1"
     group2_ns = "group_2"
-    group3_ns = "group_2"
+    group3_ns = "group_3"
 
     package_directory = get_package_share_directory(package)
     launch_file_path = os.path.join(package_directory, "launch", launch_file)
