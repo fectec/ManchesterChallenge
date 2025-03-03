@@ -45,20 +45,20 @@ class ControllerNode(Node):
         # Create a service client for /EnableDynamicSystemNode and /EnableSetpointNode 
 
         self.simulation_running = False
-        self.setpoint_cli = self.create_client(SetProcessBool, 'EnableSetpointNode')
-        while not self.setpoint_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('EnableSetpointNode not available...')
-
-        self.dynamic_system_enabled = False
         self.dynamic_system_cli = self.create_client(SetProcessBool, 'EnableDynamicSystemNode')
         while not self.dynamic_system_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('EnableDynamicSystemNode not available...')
+
+        self.setpoint_enabled = False
+        self.setpoint_cli = self.create_client(SetProcessBool, 'EnableSetpointNode')
+        while not self.setpoint_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('EnableSetpointNode not available...')
 
         # Node startup log
         self.get_logger().info("Controller Node Started 🚀")
 
         # Enable Dynamic System Node
-        self.enable_setpoint_node(True)
+        self.enable_dynamic_system_node(True)
     
     # Timer callback: Compute PID control output and publish it
     def timer_callback(self):
@@ -96,47 +96,47 @@ class ControllerNode(Node):
     def setpoint_callback(self, msg):
         self.setpoint = msg.data
 
-    def enable_setpoint_node(self, enable: bool):
+    def enable_dynamic_system_node(self, enable: bool):
         request = SetProcessBool.Request()
         request.enable = enable
         
-        future = self.setpoint_cli.call_async(request)
-        future.add_done_callback(self.enable_setpoint_node_callback)
+        future = self.dynamic_system_cli.call_async(request)
+        future.add_done_callback(self.enable_dynamic_system_node_callback)
 
-    def enable_dynamic_system_node(self, enable: bool):
-        if enable and not self.dynamic_system_enabled:
+    def enable_setpoint_node(self, enable: bool):
+        if enable and not self.setpoint_enabled:
             request = SetProcessBool.Request()
             request.enable = enable
             
-            future = self.dynamic_system_cli.call_async(request)
-            future.add_done_callback(self.enable_dynamic_system_node_callback)
+            future = self.setpoint_cli.call_async(request)
+            future.add_done_callback(self.enable_setpoint_node_callback)
         else:
-            self.get_logger().info("Dynamic System Node is already enabled, skipping service call.")
+            self.get_logger().info("Setpoint Node is already enabled, skipping service call.")
         
-    def enable_setpoint_node_callback(self, future):
-        try:
-            response = future.result()
-            if response.success:
-                self.simulation_running = True
-                self.get_logger().info(f'Successful EnableSetpointNode service: {response.message} / 🚀 Controller Simulation Started')
-                self.enable_dynamic_system_node(True)
-            else:
-                self.simulation_running = False
-                self.get_logger().warn(f'Failed EnableSetpointNode service: {response.message}')
-        except Exception as e:
-            self.simulation_running = False
-            self.get_logger().error(f'Failed EnableSetpointNode service call: {e}')
-
     def enable_dynamic_system_node_callback(self, future):
         try:
             response = future.result()
             if response.success:
-                self.dynamic_system_enabled = True  
-                self.get_logger().info(f'Successful EnableDynamicSystemNode service: {response.message}')
+                self.simulation_running = True
+                self.get_logger().info(f'Successful EnableDynamicSystemNode service: {response.message} / 🚀 Controller Simulation Started')
+                self.enable_setpoint_node(True)
             else:
+                self.simulation_running = False
                 self.get_logger().warn(f'Failed EnableDynamicSystemNode service: {response.message}')
         except Exception as e:
+            self.simulation_running = False
             self.get_logger().error(f'Failed EnableDynamicSystemNode service call: {e}')
+
+    def enable_setpoint_node_callback(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                self.setpoint_enabled = True  # Mark as enabled
+                self.get_logger().info(f'Successful EnableSetpointNode service: {response.message}')
+            else:
+                self.get_logger().warn(f'Failed EnableSetpointNode service: {response.message}')
+        except Exception as e:
+            self.get_logger().error(f'Failed EnableSetpointNode service call: {e}')
 
     # Parameter callback to update controller parameters dynamically
     def parameter_callback(self, params):

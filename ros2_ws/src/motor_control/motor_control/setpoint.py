@@ -37,7 +37,7 @@ class SetpointPublisherNode(Node):
         # Set up parameter callback for dynamic updates
         self.add_on_set_parameters_callback(self.parameter_callback)
 
-        # Set service callback
+         # Set service callback
         self.simulation_running = False
         self.srv = self.create_service(SetProcessBool, 'EnableSetpointNode', self.enable_setpoint_node)
 
@@ -64,7 +64,7 @@ class SetpointPublisherNode(Node):
         # Publish the signal
         self.signal_publisher.publish(self.signal_msg)
 
-     # Service callback to start / stop simulation
+    # Service callback to start / stop simulation
     def enable_setpoint_node(self, request, response):
         if request.enable:
             self.simulation_running = True
