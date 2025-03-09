@@ -25,7 +25,7 @@
 // Encoder pins and configuration
 #define ENCODER_A 35              // Encoder channel A pin
 #define ENCODER_B 34              // Encoder channel B pin
-#define ENCODER_RESOLUTION 1024   // Number of ticks per full revolution
+#define ENCODER_RESOLUTION 13     // Number of ticks per full revolution (puzzlebot motor)
 
 // H-Bridge (Motor Driver) configuration
 #define PWM_PIN   4               // PWM output
