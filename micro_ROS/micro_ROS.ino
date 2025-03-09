@@ -31,7 +31,7 @@
 #define PWM_PIN   4               // PWM output
 #define PWM_IN1   18              // Motor direction pin 1
 #define PWM_IN2   15              // Motor direction pin 2
-#define PWM_FRQ   980             // PWM frequency
+#define PWM_FRQ   100             // PWM frequency
 #define PWM_RES   8               // PWM resolution (8 bits)
 #define PWM_CHNL  0               // PWM channel
 
