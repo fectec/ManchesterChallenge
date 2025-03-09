@@ -5,6 +5,8 @@ from rclpy.node import Node
 from std_msgs.msg import Float32
 from rcl_interfaces.msg import SetParametersResult
 import numpy as np
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy, QoSDurabilityPolicy
+
 
 class SetpointPublisherNode(Node):
 
@@ -33,8 +35,16 @@ class SetpointPublisherNode(Node):
         # Calcular la duración del segmento (10 ciclos del seno)
         self.segment_duration = 10 * (1 / self.frequency)
 
+        # Definir un QoS profile confiable según la plantilla
+        qos_profile = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.VOLATILE
+        )
+
         # Crear publicador y timer
-        self.signal_publisher = self.create_publisher(Float32, "setpoint", 10)
+        self.signal_publisher = self.create_publisher(Float32, "setpoint", qos_profile)
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
 
         # Mensaje de salida y tiempos de referencia
