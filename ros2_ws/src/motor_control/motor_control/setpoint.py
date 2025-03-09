@@ -89,13 +89,13 @@ class SetpointPublisherNode(Node):
                 else:
                     self.amplitude = param.value
                     self.get_logger().info(f"Amplitude updated to {self.amplitude}.")
-            elif param.name == "angular_frequency":
+            elif param.name == "frequency":
                 if param.value < 0.0:
-                    self.get_logger().warn("Invalid value for angular frequency. Must be non-negative.")
-                    return SetParametersResult(successful=False, reason="Angular frequency cannot be negative.")
+                    self.get_logger().warn("Invalid value for frequency. Must be non-negative.")
+                    return SetParametersResult(successful=False, reason="Frequency cannot be negative.")
                 else:
-                    self.angular_frequency = param.value
-                    self.get_logger().info(f"Angular frequency updated to {self.angular_frequency}.")
+                    self.frequency = param.value
+                    self.get_logger().info(f"Frequency updated to {self.frequency}.")
             elif param.name == "timer_period":
                 if param.value <= 0.0:
                     self.get_logger().warn("Invalid value for timer_period. It must be greater than 0.")
