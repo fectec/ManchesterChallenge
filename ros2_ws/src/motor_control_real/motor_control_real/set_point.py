@@ -14,7 +14,7 @@ class SetpointPublisherNode(Node):
         # Declarar parámetros
         self.declare_parameter("timer_period", 0.1)         # Periodo del timer
         self.declare_parameter("amplitude", 1.0)              # Amplitud de la señal
-        self.declare_parameter("frequency", 1.0)      # Frecuencia
+        self.declare_parameter("frequency", 1.0)              # Frecuencia en Hz
 
         # Obtener parámetros
         self.timer_period = self.get_parameter("timer_period").value
@@ -25,7 +25,7 @@ class SetpointPublisherNode(Node):
         self.angular_frequency = 2 * np.pi * self.frequency
 
         # Calcular la duración del segmento (10 ciclos del seno)
-        self.segment_duration = 10 * ( 1 / self.frequency)
+        self.segment_duration = 10 * (1 / self.frequency)
 
         # Crear publicador y timer
         self.signal_publisher = self.create_publisher(Float32, "setpoint", 10)
@@ -36,7 +36,8 @@ class SetpointPublisherNode(Node):
         self.start_time = self.get_clock().now()
 
         # Variables para alternar señales
-        self.wave_types = ["sine", "square", "step", "trapezoidal", "ramp"]
+        # Se agrega 'sawtooth' para la señal de sierra.
+        self.wave_types = ["sine", "square", "step", "trapezoidal", "ramp", "sawtooth"]
         self.current_wave_index = 0
         self.segment_start_time = self.get_clock().now()
 
@@ -52,7 +53,7 @@ class SetpointPublisherNode(Node):
         # Tiempo transcurrido en el segmento actual
         segment_elapsed = (current_time - self.segment_start_time).nanoseconds / 1e9
 
-        # Verificar si se completó la duración del segmento
+        # Verificar si se completó la duración del segmento (10 ciclos)
         if segment_elapsed >= self.segment_duration:
             # Pasar al siguiente tipo de señal (cíclicamente)
             self.current_wave_index = (self.current_wave_index + 1) % len(self.wave_types)
@@ -65,31 +66,40 @@ class SetpointPublisherNode(Node):
 
         # Generar el setpoint según el tipo de señal
         if wave_type == "sine":
+            # Señal sinusoidal: se usan 10 ciclos en el segmento
             self.signal_msg.data = self.amplitude * np.sin(self.angular_frequency * segment_elapsed)
         elif wave_type == "square":
+            # Señal cuadrada
             self.signal_msg.data = self.amplitude * np.sign(np.sin(self.angular_frequency * segment_elapsed))
         elif wave_type == "step":
-            # Ejemplo: señal escalón que cambia a la mitad del segmento
+            # Señal escalón: cambio a la mitad del segmento
             if segment_elapsed < self.segment_duration / 2:
                 self.signal_msg.data = 0.0
             else:
                 self.signal_msg.data = self.amplitude
         elif wave_type == "trapezoidal":
-            # Dividir el segmento en 4 partes iguales
-            quarter = self.segment_duration / 4
-            if segment_elapsed < quarter:  # Subida lineal
-                self.signal_msg.data = self.amplitude * (segment_elapsed / quarter)
-            elif segment_elapsed < 2 * quarter:  # Meseta alta
+            # Para la señal trapezoidal, se genera un trapecio en cada ciclo (periodo = 1/frequency)
+            cycle_period = 1.0 / self.frequency
+            cycle_elapsed = segment_elapsed % cycle_period
+            quarter = cycle_period / 4.0
+            if cycle_elapsed < quarter:  # Subida lineal
+                self.signal_msg.data = self.amplitude * (cycle_elapsed / quarter)
+            elif cycle_elapsed < 2 * quarter:  # Meseta alta
                 self.signal_msg.data = self.amplitude
-            elif segment_elapsed < 3 * quarter:  # Bajada lineal
-                self.signal_msg.data = self.amplitude * (1 - (segment_elapsed - 2 * quarter) / quarter)
+            elif cycle_elapsed < 3 * quarter:  # Bajada lineal
+                self.signal_msg.data = self.amplitude * (1 - (cycle_elapsed - 2 * quarter) / quarter)
             else:  # Meseta baja
                 self.signal_msg.data = 0.0
         elif wave_type == "ramp":
-            # Señal en rampa: aumenta linealmente de 0 a la amplitud en el segmento
+            # Señal rampa: aumenta linealmente de 0 a la amplitud durante el segmento completo (10 ciclos)
             self.signal_msg.data = self.amplitude * (segment_elapsed / self.segment_duration)
+        elif wave_type == "sawtooth":
+            # Señal de sierra: rampa que se reinicia cada ciclo (periodo = 1/frequency)
+            cycle_period = 1.0 / self.frequency
+            cycle_elapsed = segment_elapsed % cycle_period
+            self.signal_msg.data = self.amplitude * (cycle_elapsed / cycle_period)
         else:
-            self.get_logger().warn(f"Tipo de señal desconocido: {wave_type}. Usando senal sinusoidal por defecto.")
+            self.get_logger().warn(f"Tipo de señal desconocido: {wave_type}. Usando señal sinusoidal por defecto.")
             self.signal_msg.data = self.amplitude * np.sin(self.angular_frequency * segment_elapsed)
 
         # Publicar el mensaje de setpoint
@@ -107,8 +117,8 @@ class SetpointPublisherNode(Node):
                     self.get_logger().warn("La frecuencia debe ser positiva.")
                     return SetParametersResult(successful=False, reason="Frequency must be positive.")
                 self.frequency = param.value
-                # Actualizar la duración del segmento si la frecuencia cambia
-                self.segment_duration = 10 * (1/ self.frequency)
+                # Actualizar la duración del segmento si la frecuencia cambia (10 ciclos)
+                self.segment_duration = 10 * (1 / self.frequency)
                 # Actualizar la frecuencia angular si la frecuencia cambia
                 self.angular_frequency = 2 * np.pi * self.frequency
             elif param.name == "timer_period":
