@@ -18,12 +18,6 @@ def generate_launch_description():
                     output='screen'
                     )
     
-    rqt_node = Node(name='rqt_plot',
-                    package='rqt_plot',
-                    executable='rqt_plot',
-                    arguments=['/setpoint/data']
-                    )
-    
-    l_d = LaunchDescription([micro_ros_agent, set_point, rqt_node ])
+    l_d = LaunchDescription([micro_ros_agent, set_point])
 
     return l_d
