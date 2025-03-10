@@ -12,8 +12,8 @@
 
 // ===== TIMING CONFIGURATION =====
 // All timing values in milliseconds (ms)
-#define CONTROL_LOOP_FREQ_HZ     100    // Control loop frequency in Hz (100Hz = 10ms period)
-#define EXECUTOR_SPIN_TIME_MS    1      // Time for executor to process messages (ms)
+#define CONTROL_LOOP_FREQ_HZ     1000   // Control loop frequency in Hz (100Hz = 10ms period)
+#define EXECUTOR_SPIN_TIME_MS    10     // Time for executor to process messages (ms)
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
 #define PING_CHECK_INTERVAL_MS   200    // How often to ping agent in CONNECTED state
 #define PING_TIMEOUT_MS          100    // How long to wait for ping response
