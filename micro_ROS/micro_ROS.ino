@@ -26,7 +26,6 @@
 #define ENCODER_A 35              // Encoder channel A pin
 #define ENCODER_B 34              // Encoder channel B pin
 #define ENCODER_RESOLUTION 12     // Number of ticks per full revolution (puzzlebot motor)
-
 #define ENCODER_GEAR_RATIO 34
 
 // H-Bridge (Motor Driver) configuration
