@@ -13,18 +13,18 @@
 
 // ===== TIMING CONFIGURATION =====
 // All timing values
-#define CONTROL_LOOP_FREQ_HZ     100    // Control loop frequency in Hz
+#define CONTROL_LOOP_FREQ_HZ     10     // Control loop frequency in Hz
 #define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)
 #define CONTROL_LOOP_DELAY       8
-#define EXECUTOR_SPIN_TIME_MS    1      // Time for executor to process messages
+#define EXECUTOR_SPIN_TIME_MS    10     // Time for executor to process messages
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
 #define PING_CHECK_INTERVAL_MS   200    // How often to ping agent in CONNECTED state
 #define PING_TIMEOUT_MS          100    // How long to wait for ping response
 
 // ===== HARDWARE DEFINITIONS =====
 // Encoder
-#define ENCODER_A 35              // Encoder channel A pin
-#define ENCODER_B 34              // Encoder channel B pin
+#define ENCODER_A 32              // Encoder channel A pin
+#define ENCODER_B 33              // Encoder channel B pin
 #define ENCODER_RESOLUTION 12.0   // Counts per motor shaft rotation 
 #define ENCODER_GEAR_RATIO 34.0   // Motor shaft rotations per output shaft rotation      
 
@@ -100,12 +100,12 @@ float previous_angular_velocity = 0.0;
 float filtered_angular_velocity = 0.0;
 
 // PID control parameters
-float kp = 0.0;                   // Proportional gain
+float kp = 20.0;                   // Proportional gain
 float ki = 0.0;                   // Integral gain
 float kd = 0.0;                   // Derivative gain
 
 // PID variables
-const float sampling_time = 1 / CONTROL_LOOP_FREQ_HZ;
+const float sampling_time = 1.0 / CONTROL_LOOP_FREQ_HZ;
 volatile long previous_time = 0, current_time = 0, elapsed_time = 0;
 float setpoint = 0.0;             
 float error = 0.0, last_error = 0.0, last_last_error = 0.0;
@@ -238,10 +238,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
 
   if (timer != NULL) {
     float local_encoder_velocity = 0.0;
-
-    noInterrupts();
     local_encoder_velocity = encoder_velocity;
-    interrupts();
 
     angular_velocity = 2.0 * M_PI * local_encoder_velocity / (ENCODER_RESOLUTION * ENCODER_GEAR_RATIO);
 
@@ -286,11 +283,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
       digitalWrite(PWM_IN2, LOW); 
     }
 
-    analogWrite(PWM_PIN, (int) fabs(output));
-	  
-    // Pause to smooth the movement
-
-	  delay(CONTROL_LOOP_DELAY);
+    ledcWrite(PWM_PIN, (int) fabs(output));
 
 	  // Update the previous time for the next iteration
 
@@ -337,6 +330,9 @@ void setup() {
   // Setup PWM
   ledcSetup(PWM_CHNL, PWM_FRQ, PWM_RES);
   ledcAttachPin(PWM_PIN, PWM_CHNL);
+
+  // Initialize encoder time
+  last_encoder_time = micros();
 }
 
 // ===== ARDUINO LOOP FUNCTION =====
