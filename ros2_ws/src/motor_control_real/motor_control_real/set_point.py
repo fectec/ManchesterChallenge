@@ -15,12 +15,12 @@ class SetpointPublisherNode(Node):
 
         # Declarar parámetros
         self.declare_parameter("timer_period", 0.1)         # Periodo del timer
-        self.declare_parameter("amplitude", 1.0)              # Amplitud de la señal
-        self.declare_parameter("frequency", 1.0)              # Frecuencia en Hz
+        self.declare_parameter("amplitude", 8.0)              # Amplitud de la señal
+        self.declare_parameter("frequency", 0.05)              # Frecuencia en Hz
 
         # Declarar nuevos parámetros para modo fijo
-        self.declare_parameter("hold_single", False)        # Si True, se mantiene una única forma
-        self.declare_parameter("fixed_wave", "sine")          # Forma fija a utilizar
+        self.declare_parameter("hold_single", True)        # Si True, se mantiene una única forma
+        self.declare_parameter("fixed_wave", "step")          # Forma fija a utilizar
 
         # Obtener parámetros
         self.timer_period = self.get_parameter("timer_period").value

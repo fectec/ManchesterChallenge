@@ -12,7 +12,7 @@
 
 // ===== TIMING CONFIGURATION =====
 // All timing values in milliseconds (ms)
-#define CONTROL_LOOP_FREQ_HZ     1000   // Control loop frequency in Hz (100Hz = 10ms period)
+#define CONTROL_LOOP_FREQ_HZ     10   // Control loop frequency in Hz (100Hz = 10ms period)
 #define EXECUTOR_SPIN_TIME_MS    10     // Time for executor to process messages (ms)
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
 #define PING_CHECK_INTERVAL_MS   200    // How often to ping agent in CONNECTED state
@@ -25,7 +25,9 @@
 // Encoder pins and configuration
 #define ENCODER_A 35              // Encoder channel A pin
 #define ENCODER_B 34              // Encoder channel B pin
-#define ENCODER_RESOLUTION 13     // Number of ticks per full revolution (puzzlebot motor)
+#define ENCODER_RESOLUTION 12     // Number of ticks per full revolution (puzzlebot motor)
+
+#define ENCODER_GEAR_RATIO 34
 
 // H-Bridge (Motor Driver) configuration
 #define PWM_PIN   4               // PWM output
@@ -64,7 +66,7 @@ unsigned long previous_time = 0;              // To store the previous time
 float angular_velocity = 0.0;                 // Current motor velocity
 
 // PID control parameters
-float kp = 1.0;                   // Proportional gain
+float kp = 0.05;                   // Proportional gain
 float ki = 0.0;                   // Integral gain
 float kd = 0.0;                   // Derivative gain
 
@@ -188,11 +190,13 @@ float get_angular_velocity() {
   // Calculate the time difference (in seconds)
   float time_diff = (current_time - previous_time) / 1000.0;  // Convert from milliseconds to seconds
   
+  // noInterrupts();
   // Get the change in encoder count
   int32_t encoder_diff = encoder_count - previous_encoder_count;
+  // interrupts();
   
   // Convert encoder count to angle (in radians)
-  float angle_diff = encoder_diff * (2 * M_PI / ENCODER_RESOLUTION);
+  float angle_diff = encoder_diff * (2 * M_PI / (ENCODER_GEAR_RATIO * ENCODER_RESOLUTION));
   
   // Calculate the angular velocity in radians per second
   float angular_velocity = angle_diff / time_diff;
@@ -203,6 +207,7 @@ float get_angular_velocity() {
   
   // Return the angular velocity in radians per second
   return angular_velocity;
+  // return encoder_diff;
 }
 
 // Function to calculate motor input using PID
