@@ -213,6 +213,8 @@ void destroy_entities() {
 
 // ===== INTERRUPT SERVICE ROUTINES =====
 void IRAM_ATTR encoderA_ISR() {
+  digitalWrite(LED_DEBUG_PIN, HIGH);
+  
   // Read encoder channel B when ENCODER_A rises
   int B = digitalRead(ENCODER_B);
   int increment = (B > 0) ? 1 : -1;
@@ -223,6 +225,8 @@ void IRAM_ATTR encoderA_ISR() {
   float elapsed_time = ((float)(current_time - last_encoder_time)) / 1.0e6;
   encoder_velocity = increment / elapsed_time;  // encoder counts / second
   last_encoder_time = current_time;
+
+  digitalWrite(LED_DEBUG_PIN, LOW);
 }
 
 // ===== CALLBACK FUNCTIONS =====
