@@ -22,6 +22,8 @@
 #define PING_TIMEOUT_MS          100    // How long to wait for ping response
 
 // ===== HARDWARE DEFINITIONS =====
+#define LED_DEBUG_PIN 2
+
 // Encoder
 #define ENCODER_A 32              // Encoder channel A pin
 #define ENCODER_B 33              // Encoder channel B pin
@@ -101,8 +103,8 @@ float filtered_angular_velocity = 0.0;
 
 // PID control parameters
 float kp = 20.0;                   // Proportional gain
-float ki = 0.0;                   // Integral gain
-float kd = 0.0;                   // Derivative gain
+float ki = 0.0;                    // Integral gain
+float kd = 0.0;                    // Derivative gain
 
 // PID variables
 const float sampling_time = 1.0 / CONTROL_LOOP_FREQ_HZ;
@@ -117,7 +119,7 @@ bool create_entities();
 void destroy_entities();
 
 // Interrupt Service Routines
-void IRAM_ATTR encoderA_isr();
+void IRAM_ATTR encoderA_ISR();
 
 // Callback functions
 void setpoint_subscription_callback(const void *msgin);
@@ -136,7 +138,6 @@ bool create_entities() {
   RCCHECK(rclc_node_init_default(&motor_node, "motor_controller", "", &support));
 
   // Create subscriber for setpoint - RELIABLE QoS
-  // Rationale: Motor commands are critical and must always be received
   RCCHECK(rclc_subscription_init_default(
     &setpoint_subscriber,
     &motor_node,
@@ -144,7 +145,6 @@ bool create_entities() {
     "setpoint"));
 
   // Create publisher for motor output (actual velocity) - BEST EFFORT QoS
-  // Rationale: High-frequency sensor-like data where latest values are more important
   RCCHECK(rclc_publisher_init_best_effort(
     &motor_output_publisher,
     &motor_node,
@@ -152,7 +152,6 @@ bool create_entities() {
     "motor_output"));
 
   // Create publisher for error - BEST EFFORT QoS
-  // Rationale: Diagnostic data where latest values matter more than delivery guarantee
   RCCHECK(rclc_publisher_init_best_effort(
     &error_publisher,
     &motor_node,
@@ -160,7 +159,6 @@ bool create_entities() {
     "error"));
 
   // Create publisher for motor input (control signal) - RELIABLE QoS
-  // Rationale: Important for debugging and monitoring the control system
   RCCHECK(rclc_publisher_init_default(
     &motor_input_publisher,
     &motor_node,
@@ -168,7 +166,6 @@ bool create_entities() {
     "motor_input"));
 
   // Create publisher for encoder count - BEST EFFORT QoS
-  // Rationale: High-frequency sensor data where occasional losses are acceptable
   RCCHECK(rclc_publisher_init_best_effort(
     &encoder_count_publisher,
     &motor_node,
@@ -213,12 +210,13 @@ void destroy_entities() {
 
 // ===== INTERRUPT SERVICE ROUTINES =====
 void IRAM_ATTR encoderA_ISR() {
+  // Toggle debug LED to indicate ISR entry
   digitalWrite(LED_DEBUG_PIN, HIGH);
-  
+
   // Read encoder channel B when ENCODER_A rises
   int B = digitalRead(ENCODER_B);
   int increment = (B > 0) ? 1 : -1;
-  encoder_count = encoder_count + increment;
+  encoder_count += increment;
 
   // Compute instantaneous velocity in the interrupt
   long current_time = micros();
@@ -226,6 +224,7 @@ void IRAM_ATTR encoderA_ISR() {
   encoder_velocity = increment / elapsed_time;  // encoder counts / second
   last_encoder_time = current_time;
 
+  // Turn off the debug LED before exiting the ISR
   digitalWrite(LED_DEBUG_PIN, LOW);
 }
 
@@ -241,13 +240,11 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);  // Prevents compiler warnings about unused parameter
 
   if (timer != NULL) {
-    float local_encoder_velocity = 0.0;
-    local_encoder_velocity = encoder_velocity;
+    float local_encoder_velocity = encoder_velocity;
 
     angular_velocity = 2.0 * M_PI * local_encoder_velocity / (ENCODER_RESOLUTION * ENCODER_GEAR_RATIO);
 
     // Low pass-filter (25 Hz cutoff)
-
     filtered_angular_velocity = 0.854 * filtered_angular_velocity + 0.0728 * angular_velocity + 0.0728 * previous_angular_velocity;
     previous_angular_velocity = angular_velocity;
 
@@ -262,15 +259,15 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
     
     last_output = output;
 
-    output = last_output + (kd / sampling_time) * last_last_error + (-kp - 2.0 * (kd / sampling_time) + (ki * sampling_time)) * last_error + (kp + (kd / sampling_time)) * error;
+    output = last_output + (kd / sampling_time) * last_last_error +
+             (-kp - 2.0 * (kd / sampling_time) + (ki * sampling_time)) * last_error +
+             (kp + (kd / sampling_time)) * error;
     
-    // Limit manipulation inside the range
-
+    // Limit manipulation within the range
     if(output < -255) output = -255;
     if(output > 255) output = 255;
 
     // Move the motor with the manipulation
-
     if(output < 0)
     {
       digitalWrite(PWM_IN1, LOW);
@@ -289,8 +286,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
 
     ledcWrite(PWM_PIN, (int) fabs(output));
 
-	  // Update the previous time for the next iteration
-
+    // Update the previous time for the next iteration
     previous_time = current_time;
 
     // Publish all relevant data
@@ -312,6 +308,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
     RCSOFTCHECK(rcl_publish(&encoder_count_publisher, &encoder_count_msg, NULL));
   }
 }
+
 // ===== ARDUINO SETUP FUNCTION =====
 void setup() {
   // Initializes communication between ESP32 and the ROS 2 Agent (serial)
@@ -321,6 +318,9 @@ void setup() {
   state = WAITING_AGENT;
 
   // Setup microcontroller pins
+  pinMode(LED_DEBUG_PIN, OUTPUT);
+  digitalWrite(LED_DEBUG_PIN, LOW);
+
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
 
@@ -335,8 +335,9 @@ void setup() {
   ledcSetup(PWM_CHNL, PWM_FRQ, PWM_RES);
   ledcAttachPin(PWM_PIN, PWM_CHNL);
 
-  // Initialize encoder time
+  // Initialize encoder time and PID previous time to current micros value
   last_encoder_time = micros();
+  previous_time = micros();
 }
 
 // ===== ARDUINO LOOP FUNCTION =====
@@ -353,7 +354,7 @@ void loop() {
       state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
       if (state == WAITING_AGENT) {
         destroy_entities();
-      };
+      }
       break;
 
     case AGENT_CONNECTED:
