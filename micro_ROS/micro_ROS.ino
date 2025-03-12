@@ -1,9 +1,11 @@
+// Use esp32 by Espressif Systems Library 2.0.17 version
+
 // ===== LIBRARY INCLUDES =====
 #include <micro_ros_arduino.h>          // micro-ROS for ESP32
 #include <rcl/rcl.h>                    // Core ROS 2 Client Library
 #include <rcl/error_handling.h>         // Error handling utilities
-#include <rclc/rclc.h>                  // Micro-ROS Client Library
-#include <rclc/executor.h>              // Micro-ROS Executor
+#include <rclc/rclc.h>                  // micro-ROS Client Library
+#include <rclc/executor.h>              // micro-ROS Executor
 #include <std_msgs/msg/int32.h>         // Message type for encoder count
 #include <std_msgs/msg/float32.h>       // Message type for float values
 #include <rmw_microros/rmw_microros.h>  // For QoS settings
@@ -11,30 +13,32 @@
 #include <math.h>                       // Standard math library
 
 // ===== TIMING CONFIGURATION =====
-// All timing values in milliseconds (ms)
-#define CONTROL_LOOP_FREQ_HZ     10   // Control loop frequency in Hz (100Hz = 10ms period)
-#define EXECUTOR_SPIN_TIME_MS    10     // Time for executor to process messages (ms)
+// All timing values
+#define CONTROL_LOOP_FREQ_HZ     50     // Control loop frequency
+#define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)  // Control loop period
+#define EXECUTOR_SPIN_TIME_MS    1      // Time for executor to process messages
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
 #define PING_CHECK_INTERVAL_MS   200    // How often to ping agent in CONNECTED state
 #define PING_TIMEOUT_MS          100    // How long to wait for ping response
-
-// Calculate control loop period from frequency
-#define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)
+#define ENCODER_TIMEOUT_US       10000  // Timeout for encoder pulses
 
 // ===== HARDWARE DEFINITIONS =====
-// Encoder pins and configuration
-#define ENCODER_A 35              // Encoder channel A pin
-#define ENCODER_B 34              // Encoder channel B pin
-#define ENCODER_RESOLUTION 12     // Number of ticks per full revolution (puzzlebot motor)
-#define ENCODER_GEAR_RATIO 34
+#define LED_DEBUG_PIN 2
 
-// H-Bridge (Motor Driver) configuration
-#define PWM_PIN   4               // PWM output
-#define PWM_IN1   18              // Motor direction pin 1
-#define PWM_IN2   15              // Motor direction pin 2
+// Encoder
+#define ENCODER_A 32              // Encoder channel A pin
+#define ENCODER_B 33              // Encoder channel B pin
+#define ENCODER_RESOLUTION 12.0   // Counts per motor shaft rotation 
+#define ENCODER_GEAR_RATIO 34.0   // Motor shaft rotations per output shaft rotation      
+
+// H-Bridge (Motor Driver)
+#define PWM_PIN   4               // PWM output pin
 #define PWM_FRQ   100             // PWM frequency
 #define PWM_RES   8               // PWM resolution (8 bits)
 #define PWM_CHNL  0               // PWM channel
+#define PWM_IN1   18              // Motor direction pin 1
+#define PWM_IN2   15              // Motor direction pin 2
+#define PWM_MAX   255             // Maximum PWM value
 
 // ===== HELPER MACROS =====
 // Executes a function and returns false if it fails
@@ -43,7 +47,7 @@
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
 // Executes a statement (X) every N milliseconds
 #define EXECUTE_EVERY_N_MS(MS, X) do { \
-  static volatile int64_t init = -1; \
+  static volatile uint32_t init = -1; \
   if (init == -1) {init = uxr_millis();} \
   if (uxr_millis() - init > MS) {X; init = uxr_millis();} \
 } while(0)
@@ -56,25 +60,6 @@ enum states {
   AGENT_CONNECTED,      // Agent is connected and operational
   AGENT_DISCONNECTED    // Agent was connected but disconnected
 } state;
-
-// ===== MOTOR CONTROL VARIABLES =====
-// Encoder tracking
-volatile int32_t encoder_count = 0;
-volatile int32_t previous_encoder_count = 0;  // To store the previous encoder count
-unsigned long previous_time = 0;              // To store the previous time
-float angular_velocity = 0.0;                 // Current motor velocity
-
-// PID control parameters
-float kp = 0.05;                   // Proportional gain
-float ki = 0.0;                   // Integral gain
-float kd = 0.0;                   // Derivative gain
-
-// PID state variables
-float setpoint_value = 0.0;       // Setpoint received from the ROS topic
-float dt = CONTROL_LOOP_PERIOD_MS / 1000.0; // Control loop period in seconds
-float prev_error = 0.0;           // Previous error for derivative calculation
-float integral = 0.0;             // Integral sum of errors
-float control_signal = 0.0;       // Motor control signal
 
 // ===== ROS 2 ENTITIES =====
 // Node
@@ -90,167 +75,67 @@ rclc_support_t support;                 // Handles initialization & communicatio
 rclc_executor_t executor;               // Manages task execution (timers, callbacks, etc.)
 
 // Publishers
-rcl_publisher_t motor_output_publisher;    // Publishes actual motor velocity
-rcl_publisher_t error_publisher;           // Publishes error (setpoint - actual)
+rcl_publisher_t motor_output_publisher;    // Publishes actual motor angular velocity
+rcl_publisher_t error_publisher;           // Publishes error
 rcl_publisher_t motor_input_publisher;     // Publishes control signal to motor
-rcl_publisher_t encoder_pulses_publisher;  // Publishes raw encoder count
+rcl_publisher_t encoder_count_publisher;   // Publishes raw encoder count
 
 // Subscribers
-rcl_subscription_t setpoint_subscriber;    // Receives velocity setpoint
+rcl_subscription_t setpoint_subscriber;    // Receives motor angular velocity setpoint
 
 // Timers
 rcl_timer_t timer;                         // Timer to execute control loop at intervals
 
 // Messages
 std_msgs__msg__Float32 setpoint_msg;       // Setpoint message
-std_msgs__msg__Float32 motor_output_msg;   // Motor velocity message
+std_msgs__msg__Float32 motor_output_msg;   // Motor angular velocity message
 std_msgs__msg__Float32 error_msg;          // Error message
 std_msgs__msg__Float32 motor_input_msg;    // Control signal message
-std_msgs__msg__Int32 encoder_pulses_msg;   // Encoder count message
+std_msgs__msg__Int32 encoder_count_msg;    // Encoder count message
+
+// ===== MOTOR CONTROL VARIABLES =====
+// Encoder tracking
+volatile int32_t encoder_count = 0;
+static int32_t last_encoder_count = 0;
+volatile uint32_t last_encoder_time = 0;
+
+// Angular velocity
+float angular_velocity = 0.0;
+float previous_angular_velocity = 0.0;
+float filtered_angular_velocity = 0.0;
+
+// PID control parameters
+float kp = 20.0;                   // Proportional gain
+float ki = 30.0;                   // Integral gain
+float kd = 0.5;                    // Derivative gain
+
+// PID variables
+const float sampling_time = 1.0 / CONTROL_LOOP_FREQ_HZ;
+float setpoint = 0.0;             
+float error = 0.0, error_prev1 = 0.0, error_prev2 = 0.0;
+float output = 0.0, previous_output = 0.0, applied_output = 0.0;        
+
+// Filter coefficients
+const float filter_a_1 = 0.854, filter_b_0 = 0.0728, filter_b_1 = filter_b_0;
+
+// Debug variables
+volatile bool encoder_activity = false;  // Flag to indicate encoder activity
 
 // ===== FUNCTION PROTOTYPES =====
 // ROS 2 entity management
 bool create_entities();
 void destroy_entities();
 
-// Encoder interrupt service routines
-void IRAM_ATTR encoder_isr_A();
-void IRAM_ATTR encoder_isr_B();
+// Interrupt Service Routines
+void IRAM_ATTR encoderA_ISR();
+void IRAM_ATTR encoderB_ISR();
 
-// Control system functions
-float get_angular_velocity();
-float compute_PID(float angular_velocity);
-void apply_control_signal(float control_signal);
-
-// Callback functions
+// Callbacks
 void setpoint_subscription_callback(const void *msgin);
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 
-// ===== INTERRUPT SERVICE ROUTINES =====
-void IRAM_ATTR encoder_isr_A() {
-  bool A = digitalRead(ENCODER_A);
-  bool B = digitalRead(ENCODER_B);
-  encoder_count += (A == B) ? 1 : -1;  // Clockwise or counter-clockwise
-}
-
-void IRAM_ATTR encoder_isr_B() {
-  bool A = digitalRead(ENCODER_A);
-  bool B = digitalRead(ENCODER_B);
-  encoder_count += (A != B) ? 1 : -1;  // Clockwise or counter-clockwise
-}
-
-// ===== CALLBACK FUNCTIONS =====
-// Callback function for the setpoint subscriber
-void setpoint_subscription_callback(const void *msgin) {
-  const std_msgs__msg__Float32 *msg = (const std_msgs__msg__Float32 *)msgin;
-  setpoint_value = msg->data;  
-}
-
-// Timer callback function
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
-  RCLC_UNUSED(last_call_time);  // Prevents compiler warnings about unused parameter
-
-  if (timer != NULL) {
-    // 1. Get the current angular velocity from encoder
-    angular_velocity = get_angular_velocity();
-    
-    // 2. Compute PID control signal
-    control_signal = compute_PID(angular_velocity);
-    
-    // 3. Apply control signal to motor
-    apply_control_signal(control_signal);
-    
-    // 4. Publish all relevant data
-    
-    // Publish current angular velocity (motor output)
-    motor_output_msg.data = angular_velocity;
-    RCSOFTCHECK(rcl_publish(&motor_output_publisher, &motor_output_msg, NULL));
-    
-    // Publish error
-    error_msg.data = setpoint_value - angular_velocity;
-    RCSOFTCHECK(rcl_publish(&error_publisher, &error_msg, NULL));
-    
-    // Publish control signal (motor input)
-    motor_input_msg.data = control_signal;
-    RCSOFTCHECK(rcl_publish(&motor_input_publisher, &motor_input_msg, NULL));
-    
-    // Publish raw encoder pulses
-    encoder_pulses_msg.data = encoder_count;
-    RCSOFTCHECK(rcl_publish(&encoder_pulses_publisher, &encoder_pulses_msg, NULL));
-  }
-}
-
-// ===== MOTOR CONTROL FUNCTIONS =====
-// Function to convert encoder count to angular velocity
-float get_angular_velocity() {
-  // Get the current time
-  unsigned long current_time = millis();
-  
-  // Calculate the time difference (in seconds)
-  float time_diff = (current_time - previous_time) / 1000.0;  // Convert from milliseconds to seconds
-  
-  // noInterrupts();
-  // Get the change in encoder count
-  int32_t encoder_diff = encoder_count - previous_encoder_count;
-  // interrupts();
-  
-  // Convert encoder count to angle (in radians)
-  float angle_diff = encoder_diff * (2 * M_PI / (ENCODER_GEAR_RATIO * ENCODER_RESOLUTION));
-  
-  // Calculate the angular velocity in radians per second
-  float angular_velocity = angle_diff / time_diff;
-  
-  // Store the current encoder count and time for the next update
-  previous_encoder_count = encoder_count;
-  previous_time = current_time;
-  
-  // Return the angular velocity in radians per second
-  return angular_velocity;
-  // return encoder_diff;
-}
-
-// Function to calculate motor input using PID
-float compute_PID(float angular_velocity) {
-  // Calculate error (difference between setpoint and actual velocity)
-  float error_value = setpoint_value - angular_velocity;
-  
-  // Calculate integral term and apply anti-windup
-  integral += error_value * dt;
-  integral = constrain(integral, -1.0, 1.0);
-  
-  // Calculate derivative term
-  float derivative = (error_value - prev_error) / dt;
-  
-  // Calculate final control signal
-  float control_signal = (kp * error_value) + (ki * integral) + (kd * derivative);
-  
-  // Store current error for next iteration
-  prev_error = error_value;
-  
-  // Constrain control signal to valid range (-1.0 to 1.0)
-  return constrain(control_signal, -1.0, 1.0);
-}
-
-// Function to apply control signal to motor
-void apply_control_signal(float control_signal) {
-  // Convert -1 to 1 range into a valid PWM duty cycle (0-255)
-  int pwm_value = (int)(fabs(control_signal) * ((1 << PWM_RES) - 1));
-  
-  // Motor control logic - set direction based on sign
-  if (control_signal > 0) {
-    digitalWrite(PWM_IN1, HIGH);
-    digitalWrite(PWM_IN2, LOW);
-  } else if (control_signal < 0) {
-    digitalWrite(PWM_IN1, LOW);
-    digitalWrite(PWM_IN2, HIGH);
-  } else {
-    digitalWrite(PWM_IN1, LOW);
-    digitalWrite(PWM_IN2, LOW);
-  }
-
-  // Apply PWM value to motor
-  ledcWrite(PWM_CHNL, pwm_value);
-}
+// Motor control
+float set_motor_output(float output_value);
 
 // ===== ROS 2 ENTITY MANAGEMENT FUNCTIONS =====
 // ROS 2 entity creation function
@@ -265,7 +150,6 @@ bool create_entities() {
   RCCHECK(rclc_node_init_default(&motor_node, "motor_controller", "", &support));
 
   // Create subscriber for setpoint - RELIABLE QoS
-  // Rationale: Motor commands are critical and must always be received
   RCCHECK(rclc_subscription_init_default(
     &setpoint_subscriber,
     &motor_node,
@@ -273,7 +157,6 @@ bool create_entities() {
     "setpoint"));
 
   // Create publisher for motor output (actual velocity) - BEST EFFORT QoS
-  // Rationale: High-frequency sensor-like data where latest values are more important
   RCCHECK(rclc_publisher_init_best_effort(
     &motor_output_publisher,
     &motor_node,
@@ -281,7 +164,6 @@ bool create_entities() {
     "motor_output"));
 
   // Create publisher for error - BEST EFFORT QoS
-  // Rationale: Diagnostic data where latest values matter more than delivery guarantee
   RCCHECK(rclc_publisher_init_best_effort(
     &error_publisher,
     &motor_node,
@@ -289,20 +171,18 @@ bool create_entities() {
     "error"));
 
   // Create publisher for motor input (control signal) - RELIABLE QoS
-  // Rationale: Important for debugging and monitoring the control system
   RCCHECK(rclc_publisher_init_default(
     &motor_input_publisher,
     &motor_node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32),
     "motor_input"));
 
-  // Create publisher for encoder pulses - BEST EFFORT QoS
-  // Rationale: High-frequency sensor data where occasional losses are acceptable
+  // Create publisher for encoder count - BEST EFFORT QoS
   RCCHECK(rclc_publisher_init_best_effort(
-    &encoder_pulses_publisher,
+    &encoder_count_publisher,
     &motor_node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-    "encoder_pulses"));
+    "encoder_count"));
 
   // Create timer that triggers control loop at fixed interval
   RCCHECK(rclc_timer_init_default(
@@ -313,7 +193,7 @@ bool create_entities() {
 
   // Initialize executor with enough handles for all entities
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
 
   // Add subscription and timer to executor
   RCCHECK(rclc_executor_add_subscription(&executor, &setpoint_subscriber, &setpoint_msg, &setpoint_subscription_callback, ON_NEW_DATA));
@@ -333,11 +213,130 @@ void destroy_entities() {
   rcl_publisher_fini(&motor_output_publisher, &motor_node);
   rcl_publisher_fini(&error_publisher, &motor_node);
   rcl_publisher_fini(&motor_input_publisher, &motor_node);
-  rcl_publisher_fini(&encoder_pulses_publisher, &motor_node);
+  rcl_publisher_fini(&encoder_count_publisher, &motor_node);
   rcl_timer_fini(&timer);
   rclc_executor_fini(&executor);
   rcl_node_fini(&motor_node);
   rclc_support_fini(&support);
+}
+
+// ===== INTERRUPT SERVICE ROUTINES =====
+void IRAM_ATTR encoderA_ISR() {
+  encoder_activity = true;
+  bool A = digitalRead(ENCODER_A);
+  bool B = digitalRead(ENCODER_B);
+  encoder_count += (A == B) ? 1 : -1;  // Clockwise or counter-clockwise
+  last_encoder_time = micros();
+}
+
+void IRAM_ATTR encoderB_ISR() {
+  encoder_activity = true;
+  bool A = digitalRead(ENCODER_A);
+  bool B = digitalRead(ENCODER_B);
+  encoder_count += (A != B) ? 1 : -1;  // Clockwise or counter-clockwise
+  last_encoder_time = micros(); 
+}
+
+// ===== CALLBACK FUNCTIONS =====
+// Callback function for the setpoint subscriber
+void setpoint_subscription_callback(const void *msgin) {
+  const std_msgs__msg__Float32 *msg = (const std_msgs__msg__Float32 *)msgin;
+  setpoint = msg->data;  
+}
+
+// Timer callback function
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
+  RCLC_UNUSED(last_call_time);  // Prevents compiler warnings about unused parameter
+
+  if (timer != NULL) {
+    // Calculate elapsed time for encoder timeout detection
+    uint32_t now = micros();
+    
+    // Check if encoder has timed out (no pulses recently)
+    if (now - last_encoder_time > ENCODER_TIMEOUT_US) {
+      // No recent encoder activity, assume motor is stopped
+      angular_velocity = 0.0;
+    } else {
+      // Get current encoder count (atomic read to prevent race condition)
+      noInterrupts();
+      int32_t current_encoder_count = encoder_count;
+      interrupts();
+      
+      // Calculate angular velocity (rad/s) based on encoder count change
+      int32_t delta_count = current_encoder_count - last_encoder_count;
+      last_encoder_count = current_encoder_count;
+      angular_velocity = 2.0 * M_PI * (float)delta_count / (ENCODER_RESOLUTION * ENCODER_GEAR_RATIO * sampling_time);
+    }
+    
+    // Apply low-pass filter to smooth velocity
+    filtered_angular_velocity = filter_a_1 * filtered_angular_velocity + 
+                                filter_b_0 * angular_velocity + 
+                                filter_b_1 * previous_angular_velocity;
+    previous_angular_velocity = angular_velocity;
+
+    // Compute the control signal using PID controller
+    error_prev2 = error_prev1;
+    error_prev1 = error;
+    error = setpoint - filtered_angular_velocity;
+    
+    previous_output = output;
+    output = previous_output + 
+             (kp + (kd / sampling_time)) * error +
+             (-kp - 2.0 * (kd / sampling_time) + (ki * sampling_time)) * error_prev1 +
+             (kd / sampling_time) * error_prev2;
+    
+    // Apply control signal to motor and get actual applied value
+    applied_output = set_motor_output(output);
+    
+    // Debug indicator for encoder activity (only update if state changes)
+    static bool last_led_state = LOW;
+    if (encoder_activity != last_led_state) {
+      digitalWrite(LED_DEBUG_PIN, encoder_activity ? HIGH : LOW);
+      last_led_state = encoder_activity;
+    }
+    encoder_activity = false; 
+
+    // Publish all relevant data
+    motor_output_msg.data = filtered_angular_velocity;
+    RCSOFTCHECK(rcl_publish(&motor_output_publisher, &motor_output_msg, NULL));
+    
+    error_msg.data = error;
+    RCSOFTCHECK(rcl_publish(&error_publisher, &error_msg, NULL));
+    
+    motor_input_msg.data = applied_output;
+    RCSOFTCHECK(rcl_publish(&motor_input_publisher, &motor_input_msg, NULL));
+    
+    encoder_count_msg.data = encoder_count;
+    RCSOFTCHECK(rcl_publish(&encoder_count_publisher, &encoder_count_msg, NULL));
+  }
+}
+
+// ===== MOTOR CONTROL FUNCTIONS =====
+
+// Function to set motor output
+float set_motor_output(float output_value) {
+  float limited_output = output_value;
+  
+  // Limit the output to the PWM bounds.
+  if(limited_output < -PWM_MAX) limited_output = -PWM_MAX;
+  if(limited_output > PWM_MAX) limited_output = PWM_MAX;
+  
+  // Set motor direction based on the sign of the output.
+  if(limited_output < 0) {
+    digitalWrite(PWM_IN1, LOW);
+    digitalWrite(PWM_IN2, HIGH);
+  } else if(limited_output > 0) {
+    digitalWrite(PWM_IN1, HIGH);
+    digitalWrite(PWM_IN2, LOW);
+  } else {
+    digitalWrite(PWM_IN1, LOW);
+    digitalWrite(PWM_IN2, LOW); 
+  }
+
+  // Set PWM duty cycle based on the absolute value of output.
+  ledcWrite(PWM_CHNL, (int)fabs(limited_output));
+  
+  return limited_output;
 }
 
 // ===== ARDUINO SETUP FUNCTION =====
@@ -349,6 +348,9 @@ void setup() {
   state = WAITING_AGENT;
 
   // Setup microcontroller pins
+  pinMode(LED_DEBUG_PIN, OUTPUT);
+  digitalWrite(LED_DEBUG_PIN, LOW);
+
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
 
@@ -356,16 +358,19 @@ void setup() {
   pinMode(PWM_IN1, OUTPUT);
   pinMode(PWM_IN2, OUTPUT);
 
-  // Attach interrupts to encoder pins A & B for quadrature detection
-  attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoder_isr_A, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_B), encoder_isr_B, CHANGE);
-
-  // Setup PWM
+  // Setup PWM for motor control
   ledcSetup(PWM_CHNL, PWM_FRQ, PWM_RES);
   ledcAttachPin(PWM_PIN, PWM_CHNL);
-  
-  // Initialize timing variables
-  previous_time = millis();
+
+  // Attach interrupts to both encoder pins for quadrature detection
+  attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoderA_ISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_B), encoderB_ISR, CHANGE);
+
+  // Initialize motor to stopped state
+  set_motor_output(0);
+
+  // Initialize timing variable
+  last_encoder_time = micros();
 }
 
 // ===== ARDUINO LOOP FUNCTION =====
@@ -382,7 +387,7 @@ void loop() {
       state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
       if (state == WAITING_AGENT) {
         destroy_entities();
-      };
+      }
       break;
 
     case AGENT_CONNECTED:
