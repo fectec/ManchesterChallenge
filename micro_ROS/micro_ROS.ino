@@ -1,4 +1,5 @@
 // Use esp32 by Espressif Systems Library 2.0.17 version
+
 // ===== LIBRARY INCLUDES =====
 #include <micro_ros_arduino.h>          // micro-ROS for ESP32
 #include <rcl/rcl.h>                    // Core ROS 2 Client Library
@@ -13,13 +14,13 @@
 
 // ===== TIMING CONFIGURATION =====
 // All timing values
-#define CONTROL_LOOP_FREQ_HZ     10     // Control loop frequency in Hz
-#define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)
-#define CONTROL_LOOP_DELAY       8
-#define EXECUTOR_SPIN_TIME_MS    10     // Time for executor to process messages
+#define CONTROL_LOOP_FREQ_HZ     40     // Control loop frequency
+#define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)  // Control loop period
+#define EXECUTOR_SPIN_TIME_MS    1      // Time for executor to process messages
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
 #define PING_CHECK_INTERVAL_MS   200    // How often to ping agent in CONNECTED state
 #define PING_TIMEOUT_MS          100    // How long to wait for ping response
+#define ENCODER_TIMEOUT_US       10000  // Timeout for encoder pulses
 
 // ===== HARDWARE DEFINITIONS =====
 #define LED_DEBUG_PIN 2
@@ -37,6 +38,7 @@
 #define PWM_CHNL  0               // PWM channel
 #define PWM_IN1   18              // Motor direction pin 1
 #define PWM_IN2   15              // Motor direction pin 2
+#define PWM_MAX   255             // Maximum PWM value
 
 // ===== HELPER MACROS =====
 // Executes a function and returns false if it fails
@@ -45,7 +47,7 @@
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
 // Executes a statement (X) every N milliseconds
 #define EXECUTE_EVERY_N_MS(MS, X) do { \
-  static volatile int64_t init = -1; \
+  static volatile uint32_t init = -1; \
   if (init == -1) {init = uxr_millis();} \
   if (uxr_millis() - init > MS) {X; init = uxr_millis();} \
 } while(0)
@@ -93,9 +95,9 @@ std_msgs__msg__Int32 encoder_count_msg;    // Encoder count message
 
 // ===== MOTOR CONTROL VARIABLES =====
 // Encoder tracking
-volatile int encoder_count = 0;
-volatile float encoder_velocity = 0.0;
-volatile long last_encoder_time = 0;
+volatile int32_t encoder_count = 0;
+static int32_t last_encoder_count = 0;
+volatile uint32_t last_encoder_time = 0;
 
 float angular_velocity = 0.0;
 float previous_angular_velocity = 0.0;
@@ -103,15 +105,21 @@ float filtered_angular_velocity = 0.0;
 
 // PID control parameters
 float kp = 20.0;                   // Proportional gain
-float ki = 0.0;                    // Integral gain
+float ki = 25.0;                   // Integral gain
 float kd = 0.0;                    // Derivative gain
 
 // PID variables
 const float sampling_time = 1.0 / CONTROL_LOOP_FREQ_HZ;
-volatile long previous_time = 0, current_time = 0, elapsed_time = 0;
 float setpoint = 0.0;             
-float error = 0.0, last_error = 0.0, last_last_error = 0.0;
-float output = 0.0, last_output = 0.0;
+float error = 0.0, error_prev1 = 0.0, error_prev2 = 0.0;
+float output = 0.0, previous_output = 0.0, applied_output = 0.0;        
+
+// Filter coefficients
+const float filter_a = 0.854;      // Primary filter coefficient 
+const float filter_b = 0.0728;     // Secondary filter coefficient
+
+// Debug variables
+volatile bool encoder_activity = false;  // Flag to indicate encoder activity
 
 // ===== FUNCTION PROTOTYPES =====
 // ROS 2 entity management
@@ -120,10 +128,14 @@ void destroy_entities();
 
 // Interrupt Service Routines
 void IRAM_ATTR encoderA_ISR();
+void IRAM_ATTR encoderB_ISR();
 
 // Callback functions
 void setpoint_subscription_callback(const void *msgin);
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
+
+// Motor control functions
+float set_motor_output(float output_value);
 
 // ===== ROS 2 ENTITY MANAGEMENT FUNCTIONS =====
 // ROS 2 entity creation function
@@ -210,22 +222,19 @@ void destroy_entities() {
 
 // ===== INTERRUPT SERVICE ROUTINES =====
 void IRAM_ATTR encoderA_ISR() {
-  // Toggle debug LED to indicate ISR entry
-  digitalWrite(LED_DEBUG_PIN, HIGH);
+  encoder_activity = true;
+  bool A = digitalRead(ENCODER_A);
+  bool B = digitalRead(ENCODER_B);
+  encoder_count += (A == B) ? 1 : -1;  // Clockwise or counter-clockwise
+  last_encoder_time = micros();
+}
 
-  // Read encoder channel B when ENCODER_A rises
-  int B = digitalRead(ENCODER_B);
-  int increment = (B > 0) ? 1 : -1;
-  encoder_count += increment;
-
-  // Compute instantaneous velocity in the interrupt
-  long current_time = micros();
-  float elapsed_time = ((float)(current_time - last_encoder_time)) / 1.0e6;
-  encoder_velocity = increment / elapsed_time;  // encoder counts / second
-  last_encoder_time = current_time;
-
-  // Turn off the debug LED before exiting the ISR
-  digitalWrite(LED_DEBUG_PIN, LOW);
+void IRAM_ATTR encoderB_ISR() {
+  encoder_activity = true;
+  bool A = digitalRead(ENCODER_A);
+  bool B = digitalRead(ENCODER_B);
+  encoder_count += (A != B) ? 1 : -1;  // Clockwise or counter-clockwise
+  last_encoder_time = micros(); 
 }
 
 // ===== CALLBACK FUNCTIONS =====
@@ -240,73 +249,94 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);  // Prevents compiler warnings about unused parameter
 
   if (timer != NULL) {
-    float local_encoder_velocity = encoder_velocity;
-
-    angular_velocity = 2.0 * M_PI * local_encoder_velocity / (ENCODER_RESOLUTION * ENCODER_GEAR_RATIO);
-
-    // Low pass-filter (25 Hz cutoff)
-    filtered_angular_velocity = 0.854 * filtered_angular_velocity + 0.0728 * angular_velocity + 0.0728 * previous_angular_velocity;
+    // Calculate elapsed time for encoder timeout detection
+    uint32_t now = micros();
+    
+    // Check if encoder has timed out (no pulses recently)
+    if (now - last_encoder_time > ENCODER_TIMEOUT_US) {
+      // No recent encoder activity, assume motor is stopped
+      angular_velocity = 0.0;
+    } else {
+      // Get current encoder count (atomic read to prevent race condition)
+      noInterrupts();
+      int32_t current_encoder_count = encoder_count;
+      interrupts();
+      
+      // Calculate angular velocity (rad/s) based on encoder count change
+      int32_t delta_count = current_encoder_count - last_encoder_count;
+      last_encoder_count = current_encoder_count;
+      angular_velocity = 2.0 * M_PI * (float)delta_count / (ENCODER_RESOLUTION * ENCODER_GEAR_RATIO * sampling_time);
+    }
+    
+    // Apply low-pass filter to smooth velocity
+    filtered_angular_velocity = filter_a * filtered_angular_velocity + 
+                                filter_b * angular_velocity + 
+                                filter_b * previous_angular_velocity;
     previous_angular_velocity = angular_velocity;
 
-    // Compute the control signal using a PID controller
-    current_time = micros();
-    elapsed_time = current_time - previous_time;
-
-    last_last_error = last_error;
-    last_error = error;
-
+    // Compute the control signal using PID controller
+    error_prev2 = error_prev1;
+    error_prev1 = error;
     error = setpoint - filtered_angular_velocity;
     
-    last_output = output;
-
-    output = last_output + (kd / sampling_time) * last_last_error +
-             (-kp - 2.0 * (kd / sampling_time) + (ki * sampling_time)) * last_error +
-             (kp + (kd / sampling_time)) * error;
+    previous_output = output;
+    output = previous_output + 
+             (kp + (kd / sampling_time)) * error +
+             (-kp - 2.0 * (kd / sampling_time) + (ki * sampling_time)) * error_prev1 +
+             (kd / sampling_time) * error_prev2;
     
-    // Limit manipulation within the range
-    if(output < -255) output = -255;
-    if(output > 255) output = 255;
-
-    // Move the motor with the manipulation
-    if(output < 0)
-    {
-      digitalWrite(PWM_IN1, LOW);
-      digitalWrite(PWM_IN2, HIGH);
+    // Apply control signal to motor and get actual applied value
+    applied_output = set_motor_output(output);
+    
+    // Debug indicator for encoder activity (only update if state changes)
+    static bool last_led_state = LOW;
+    if (encoder_activity != last_led_state) {
+      digitalWrite(LED_DEBUG_PIN, encoder_activity ? HIGH : LOW);
+      last_led_state = encoder_activity;
     }
-    else if(output > 0)
-    {
-      digitalWrite(PWM_IN1, HIGH);
-      digitalWrite(PWM_IN2, LOW);
-    }
-    else
-    {
-      digitalWrite(PWM_IN1, LOW);
-      digitalWrite(PWM_IN2, LOW); 
-    }
-
-    ledcWrite(PWM_PIN, (int) fabs(output));
-
-    // Update the previous time for the next iteration
-    previous_time = current_time;
+    encoder_activity = false; 
 
     // Publish all relevant data
-    
-    // Publish current angular velocity (motor output)
     motor_output_msg.data = filtered_angular_velocity;
     RCSOFTCHECK(rcl_publish(&motor_output_publisher, &motor_output_msg, NULL));
     
-    // Publish error
     error_msg.data = error;
     RCSOFTCHECK(rcl_publish(&error_publisher, &error_msg, NULL));
     
-    // Publish control signal (motor input)
-    motor_input_msg.data = output;
+    motor_input_msg.data = applied_output;
     RCSOFTCHECK(rcl_publish(&motor_input_publisher, &motor_input_msg, NULL));
     
-    // Publish raw encoder pulses
     encoder_count_msg.data = encoder_count;
     RCSOFTCHECK(rcl_publish(&encoder_count_publisher, &encoder_count_msg, NULL));
   }
+}
+
+// ===== MOTOR CONTROL FUNCTIONS =====
+
+// Function to set motor output
+float set_motor_output(float output_value) {
+  float limited_output = output_value;
+  
+  // Limit the output to the PWM bounds.
+  if(limited_output < -PWM_MAX) limited_output = -PWM_MAX;
+  if(limited_output > PWM_MAX) limited_output = PWM_MAX;
+  
+  // Set motor direction based on the sign of the output.
+  if(limited_output < 0) {
+    digitalWrite(PWM_IN1, LOW);
+    digitalWrite(PWM_IN2, HIGH);
+  } else if(limited_output > 0) {
+    digitalWrite(PWM_IN1, HIGH);
+    digitalWrite(PWM_IN2, LOW);
+  } else {
+    digitalWrite(PWM_IN1, LOW);
+    digitalWrite(PWM_IN2, LOW); 
+  }
+
+  // Set PWM duty cycle based on the absolute value of output.
+  ledcWrite(PWM_CHNL, (int)fabs(limited_output));
+  
+  return limited_output;
 }
 
 // ===== ARDUINO SETUP FUNCTION =====
@@ -328,16 +358,19 @@ void setup() {
   pinMode(PWM_IN1, OUTPUT);
   pinMode(PWM_IN2, OUTPUT);
 
-  // Attach interrupts to encoder pins A & B for quadrature detection
-  attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoderA_ISR, RISING);
-
-  // Setup PWM
+  // Setup PWM for motor control
   ledcSetup(PWM_CHNL, PWM_FRQ, PWM_RES);
   ledcAttachPin(PWM_PIN, PWM_CHNL);
 
-  // Initialize encoder time and PID previous time to current micros value
+  // Attach interrupts to both encoder pins for quadrature detection
+  attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoderA_ISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_B), encoderB_ISR, CHANGE);
+
+  // Initialize timing variable
   last_encoder_time = micros();
-  previous_time = micros();
+
+  // Initialize motor to stopped state
+  set_motor_output(0);
 }
 
 // ===== ARDUINO LOOP FUNCTION =====
