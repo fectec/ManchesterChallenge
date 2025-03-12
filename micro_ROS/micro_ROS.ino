@@ -14,7 +14,7 @@
 
 // ===== TIMING CONFIGURATION =====
 // All timing values
-#define CONTROL_LOOP_FREQ_HZ     40     // Control loop frequency
+#define CONTROL_LOOP_FREQ_HZ     50     // Control loop frequency
 #define CONTROL_LOOP_PERIOD_MS   (1000 / CONTROL_LOOP_FREQ_HZ)  // Control loop period
 #define EXECUTOR_SPIN_TIME_MS    1      // Time for executor to process messages
 #define AGENT_CHECK_INTERVAL_MS  500    // How often to check for agent in WAITING_AGENT state
@@ -99,14 +99,15 @@ volatile int32_t encoder_count = 0;
 static int32_t last_encoder_count = 0;
 volatile uint32_t last_encoder_time = 0;
 
+// Angular velocity
 float angular_velocity = 0.0;
 float previous_angular_velocity = 0.0;
 float filtered_angular_velocity = 0.0;
 
 // PID control parameters
 float kp = 20.0;                   // Proportional gain
-float ki = 25.0;                   // Integral gain
-float kd = 0.0;                    // Derivative gain
+float ki = 30.0;                   // Integral gain
+float kd = 0.5;                    // Derivative gain
 
 // PID variables
 const float sampling_time = 1.0 / CONTROL_LOOP_FREQ_HZ;
@@ -115,8 +116,7 @@ float error = 0.0, error_prev1 = 0.0, error_prev2 = 0.0;
 float output = 0.0, previous_output = 0.0, applied_output = 0.0;        
 
 // Filter coefficients
-const float filter_a = 0.854;      // Primary filter coefficient 
-const float filter_b = 0.0728;     // Secondary filter coefficient
+const float filter_a_1 = 0.854, filter_b_0 = 0.0728, filter_b_1 = filter_b_0;
 
 // Debug variables
 volatile bool encoder_activity = false;  // Flag to indicate encoder activity
@@ -130,11 +130,11 @@ void destroy_entities();
 void IRAM_ATTR encoderA_ISR();
 void IRAM_ATTR encoderB_ISR();
 
-// Callback functions
+// Callbacks
 void setpoint_subscription_callback(const void *msgin);
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 
-// Motor control functions
+// Motor control
 float set_motor_output(float output_value);
 
 // ===== ROS 2 ENTITY MANAGEMENT FUNCTIONS =====
@@ -269,9 +269,9 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
     }
     
     // Apply low-pass filter to smooth velocity
-    filtered_angular_velocity = filter_a * filtered_angular_velocity + 
-                                filter_b * angular_velocity + 
-                                filter_b * previous_angular_velocity;
+    filtered_angular_velocity = filter_a_1 * filtered_angular_velocity + 
+                                filter_b_0 * angular_velocity + 
+                                filter_b_1 * previous_angular_velocity;
     previous_angular_velocity = angular_velocity;
 
     // Compute the control signal using PID controller
@@ -366,11 +366,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoderA_ISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B), encoderB_ISR, CHANGE);
 
-  // Initialize timing variable
-  last_encoder_time = micros();
-
   // Initialize motor to stopped state
   set_motor_output(0);
+
+  // Initialize timing variable
+  last_encoder_time = micros();
 }
 
 // ===== ARDUINO LOOP FUNCTION =====
