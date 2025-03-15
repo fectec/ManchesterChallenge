@@ -25,6 +25,8 @@ setup(
         'console_scripts': [
             'set_point = motor_control_real.set_point:main',
             'open_loop = motor_control_real.open_loop:main',
+            'prbs = motor_control_real.prbs:main',
+            'set_point_sim = motor_control_real.set_point_sim:main',
         ],
     },
 )
