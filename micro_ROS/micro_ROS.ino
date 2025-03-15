@@ -79,6 +79,7 @@ rcl_publisher_t motor_output_publisher;    // Publishes actual motor angular vel
 rcl_publisher_t error_publisher;           // Publishes error
 rcl_publisher_t motor_input_publisher;     // Publishes control signal to motor
 rcl_publisher_t encoder_count_publisher;   // Publishes raw encoder count
+rcl_publisher_t mse_publisher;             // Publishes MSE
 
 // Subscribers
 rcl_subscription_t setpoint_subscriber;    // Receives motor angular velocity setpoint
@@ -92,6 +93,10 @@ std_msgs__msg__Float32 motor_output_msg;   // Motor angular velocity message
 std_msgs__msg__Float32 error_msg;          // Error message
 std_msgs__msg__Float32 motor_input_msg;    // Control signal message
 std_msgs__msg__Int32 encoder_count_msg;    // Encoder count message
+
+
+
+
 
 // ===== MOTOR CONTROL VARIABLES =====
 // Encoder tracking
@@ -120,6 +125,12 @@ const float filter_a_1 = 0.854, filter_b_0 = 0.0728, filter_b_1 = filter_b_0;
 
 // Debug variables
 volatile bool encoder_activity = false;  // Flag to indicate encoder activity
+
+// ===== MSE VARIABLES  =====
+volatile uint32_t mse_sample_count = 0;
+float mse_sum = 0.0;
+const uint32_t MSE_WINDOW = 100;  // 100 samplel window for MSE calculation (aprox. 2 seconds with a 50 Hz)
+std_msgs__msg__Float32 mse_msg;   // Message to publish MSE
 
 // ===== FUNCTION PROTOTYPES =====
 // ROS 2 entity management
@@ -184,6 +195,13 @@ bool create_entities() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
     "encoder_count"));
 
+  // Create publisher for MSE - BEST EFFORT QoS
+  RCCHECK(rclc_publisher_init_best_effort(
+  &mse_publisher,
+  &motor_node,
+  ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32),
+  "mse"));
+
   // Create timer that triggers control loop at fixed interval
   RCCHECK(rclc_timer_init_default(
     &timer,
@@ -214,6 +232,7 @@ void destroy_entities() {
   rcl_publisher_fini(&error_publisher, &motor_node);
   rcl_publisher_fini(&motor_input_publisher, &motor_node);
   rcl_publisher_fini(&encoder_count_publisher, &motor_node);
+  rcl_publisher_fini(&mse_publisher, &motor_node);
   rcl_timer_fini(&timer);
   rclc_executor_fini(&executor);
   rcl_node_fini(&motor_node);
@@ -308,6 +327,21 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
     
     encoder_count_msg.data = encoder_count;
     RCSOFTCHECK(rcl_publish(&encoder_count_publisher, &encoder_count_msg, NULL));
+
+    // === CÁLCULO DEL MSE ===
+    // Acumular el error cuadrático
+    mse_sum += error * error;
+    mse_sample_count++;
+    // Si alcanzamos la ventana definida, calculamos y publicamos el MSE
+    if (mse_sample_count >= MSE_WINDOW) {
+      float mse = mse_sum / mse_sample_count;
+      mse_msg.data = mse;
+      RCSOFTCHECK(rcl_publish(&mse_publisher, &mse_msg, NULL));
+      // Reiniciar acumuladores para la siguiente ventana
+      mse_sample_count = 0;
+      mse_sum = 0.0;
+    }
+
   }
 }
 

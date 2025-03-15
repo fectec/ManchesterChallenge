@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'set_point = motor_control_real.set_point:main',
+            'open_loop = motor_control_real.open_loop:main',
         ],
     },
 )
