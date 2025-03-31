@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="puzzlebot">
+    
+    <!-- Base Links -->
+    <link name="base_footprint"/>
+
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+            <geometry>
+                <mesh filename="package://puzzlebot_description/meshes/chassis.stl"/>
+            </geometry>
+            <material name="chassis_color">
+                <color rgba="0.0 0.5 1.0 1.0"/> 
+            </material>
+        </visual>
+    </link>
+
+    <!-- Fixed Joint for Base Link -->
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Left Wheel -->
+    <link name="wheel_left_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 -1.5708 0"/>
+            <geometry>
+                <mesh filename="package://puzzlebot_description/meshes/wheel.stl"/>
+            </geometry>
+            <material name="wheel_color">
+                <color rgba="0.0 0.5 1.0 1.0"/> 
+            </material> 
+        </visual>
+    </link>
+
+    <joint name="wheel_left_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="wheel_left_link"/>
+        <axis xyz="1 0 0"/>
+        <origin xyz="0.098 -0.038 0" rpy="0 0 0"/>  
+    </joint>
+
+    <!-- Right Wheel -->
+    <link name="wheel_right_link">
+        <visual>
+            <origin xyz="0 -0.014 0" rpy="0 1.5708 0"/>
+            <geometry>
+                <mesh filename="package://puzzlebot_description/meshes/wheel.stl"/>
+            </geometry>
+            <material name="wheel_color">
+                <color rgba="0.0 0.5 1.0 1.0"/> 
+            </material> 
+        </visual>
+    </link>
+
+    <joint name="wheel_right_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="wheel_right_link"/>
+        <axis xyz="1 0 0"/>
+        <origin xyz="-0.098 -0.038 0" rpy="0 0 0"/>  
+    </joint>
+
+</robot>
