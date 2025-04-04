@@ -15,6 +15,12 @@
                 <color rgba="0.0 0.5 1.0 1.0"/> 
             </material>
         </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+            <geometry>
+                <mesh filename="package://puzzlebot_description/meshes/chassis.stl"/>
+            </geometry>
+        </collision>
     </link>
 
     <!-- Fixed Joint for Base Link -->
@@ -35,6 +41,14 @@
                 <color rgba="0.0 0.5 1.0 1.0"/> 
             </material> 
         </visual>
+        <collision>
+            <geometry>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <sphere radius="0.05"/>
+                </geometry>    
+            </geometry>
+        </collision>
     </link>
 
     <joint name="wheel_right_joint" type="continuous">
@@ -55,6 +69,14 @@
                 <color rgba="0.0 0.5 1.0 1.0"/> 
             </material> 
         </visual>
+        <collision>
+            <geometry>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <sphere radius="0.05"/>
+                </geometry>    
+            </geometry>
+        </collision>
     </link>
 
     <joint name="wheel_left_joint" type="continuous">
@@ -65,7 +87,16 @@
     </joint>
 
     <!-- Caster Wheel -->
-    <link name="caster_link"/>
+    <link name="caster_link">
+        <collision>
+            <geometry>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <sphere radius="0.0075"/>
+                </geometry>    
+            </geometry>
+        </collision>
+    </link>
 
     <joint name="caster_joint" type="fixed">
         <parent link="base_footprint"/>
