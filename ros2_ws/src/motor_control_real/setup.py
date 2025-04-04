@@ -18,12 +18,12 @@ setup(
     zip_safe=True,
     maintainer='rovestrada',
     maintainer_email='rovestrada@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='This ROS 2 package provides a dynamic setpoint generator designed for controlling a real DC motor.',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'set_point = motor_control_real.set_point:main',
+            'setpoint = motor_control_real.setpoint:main',
         ],
     },
 )

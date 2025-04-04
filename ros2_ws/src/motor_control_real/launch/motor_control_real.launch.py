@@ -12,9 +12,9 @@ def generate_launch_description():
                         ]
                        )
     
-    set_point = Node(name="set_point",
+    setpoint = Node(name="setpoint",
                     package='motor_control_real',
-                    executable='set_point',
+                    executable='setpoint',
                     output='screen',
                     parameters=[
                         {"timer_period": 0.1},
@@ -22,9 +22,9 @@ def generate_launch_description():
                         {"frequency": 0.05},
                         {"hold_single": True},
                         {"fixed_wave": "sine"}
-                    ]
+                        ]
                     )
     
-    l_d = LaunchDescription([micro_ros_agent, set_point])
+    l_d = LaunchDescription([micro_ros_agent, setpoint])
 
     return l_d
