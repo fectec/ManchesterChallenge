@@ -1,8 +1,12 @@
 <?xml version="1.0"?>
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="puzzlebot">
+
+    <xacro:arg name="is_ignition" default="true"/>
+
     <xacro:include filename="$(find puzzlebot_description)/urdf/puzzlebot_gazebo.xacro"/>
-    
+    <xacro:include filename="$(find puzzlebot_description)/urdf/puzzlebot_ros2_control.xacro"/>
+
     <!-- Base Links -->
     <link name="base_footprint">
         <inertial>
