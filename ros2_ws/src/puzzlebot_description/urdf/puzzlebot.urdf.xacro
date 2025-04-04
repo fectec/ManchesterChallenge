@@ -64,4 +64,13 @@
         <origin xyz="-0.098 -0.038 0" rpy="0 0 0"/>  
     </joint>
 
+    <!-- Caster Wheel -->
+    <link name="caster_link"/>
+
+    <joint name="caster_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="caster_link"/>
+        <origin xyz="0 0.095 0" rpy="0 0 0"/>
+    </joint>
+
 </robot>
