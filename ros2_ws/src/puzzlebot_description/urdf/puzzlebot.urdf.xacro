@@ -2,6 +2,8 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="puzzlebot">
     
+    <xacro:include filename="package://puzzlebot_description/urdf/puzzlebot.gazebo.xacro"/>
+
     <!-- Base Links -->
     <link name="base_footprint"/>
 
