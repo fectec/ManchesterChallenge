@@ -17,10 +17,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='root',
-    maintainer_email='root@todo.todo',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='fectec',
+    maintainer_email='fectec151@gmail.com',
+    description='This package generates a DC motor simulation, setpoint generator and controller nodes for simulating and controlling a DC motor.',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

@@ -3,8 +3,8 @@
 <package format="3">
   <name>motor_control</name>
   <version>0.0.0</version>
-  <description>This package generates a DC motor simulation, Set Point Generator and Controller nodes for simulating and controlling a DC Motor</description>
-  <maintainer email="mario.mtz@manchester-robotics.com">Mario Martinez</maintainer>
+  <description>This package generates a DC motor simulation, setpoint generator and controller nodes for simulating and controlling a DC motor.</description>
+  <maintainer email="fectec151@gmail.com">fectec</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>

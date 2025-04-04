@@ -7,8 +7,6 @@ from rcl_interfaces.msg import SetParametersResult
 from custom_interfaces.srv import SetProcessBool
 import numpy as np
 
-# sistema_control_input
-
 class SetpointPublisherNode(Node):
 
     def __init__(self):
