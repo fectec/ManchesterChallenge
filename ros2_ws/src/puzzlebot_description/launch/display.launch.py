@@ -7,10 +7,11 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch.substitutions import Command, LaunchConfiguration
 
 def generate_launch_description():
-
+    puzzlebot_description_dir = get_package_share_directory("puzzlebot_description")
+    
     model_arg = DeclareLaunchArgument(
         name="model",
-        default_value=os.path.join(get_package_share_directory("puzzlebot_description"), "urdf", "puzzlebot.urdf.xacro"),
+        default_value=os.path.join(puzzlebot_description_dir, "urdf", "puzzlebot.urdf.xacro"),
         description="Absolute path to robot URDF file"
     )
 
@@ -32,7 +33,7 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="screen",
-        arguments=["-d", os.path.join(get_package_share_directory("puzzlebot_description"), "rviz", "display.rviz")]
+        arguments=["-d", os.path.join(puzzlebot_description_dir, "rviz", "display.rviz")]
     )
 
     return LaunchDescription([

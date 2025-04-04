@@ -1,20 +1,34 @@
 <?xml version="1.0"?>
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="puzzlebot">
+    <xacro:include filename="$(find puzzlebot_description)/urdf/puzzlebot_gazebo.xacro"/>
     
-    <xacro:include filename="package://puzzlebot_description/urdf/puzzlebot.gazebo.xacro"/>
-
     <!-- Base Links -->
-    <link name="base_footprint"/>
+    <link name="base_footprint">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+                     iyy="0.0001" iyz="0.0"
+                     izz="0.0001"/>
+        </inertial>
+    </link>
 
     <link name="base_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.82573504"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+                     iyy="0.001" iyz="0.0"
+                     izz="0.001"/>
+        </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="1.5708 0 0"/>
             <geometry>
                 <mesh filename="package://puzzlebot_description/meshes/chassis.stl"/>
             </geometry>
             <material name="chassis_color">
-                <color rgba="0.0 0.5 1.0 1.0"/> 
+                <color rgba="0.0 0.5 1.0 1.0"/>
             </material>
         </visual>
         <collision>
@@ -24,7 +38,7 @@
             </geometry>
         </collision>
     </link>
-
+    
     <!-- Fixed Joint for Base Link -->
     <joint name="base_joint" type="fixed">
         <parent link="base_footprint"/>
@@ -34,21 +48,26 @@
 
     <!-- Right Wheel -->
     <link name="wheel_right_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.053"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+                     iyy="0.001" iyz="0.0"
+                     izz="0.001"/>
+        </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 -1.5708 0"/>
             <geometry>
                 <mesh filename="package://puzzlebot_description/meshes/wheel.stl"/>
             </geometry>
             <material name="wheel_color">
-                <color rgba="0.0 0.5 1.0 1.0"/> 
-            </material> 
+                <color rgba="0.0 0.5 1.0 1.0"/>
+            </material>
         </visual>
         <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <sphere radius="0.05"/>
-                </geometry>    
+                <sphere radius="0.05"/>
             </geometry>
         </collision>
     </link>
@@ -57,26 +76,31 @@
         <parent link="base_link"/>
         <child link="wheel_right_link"/>
         <axis xyz="1 0 0"/>
-        <origin xyz="0.098 -0.038 0" rpy="0 0 0"/>  
+        <origin xyz="0.098 -0.038 0" rpy="0 0 0"/>
     </joint>
 
     <!-- Left Wheel -->
     <link name="wheel_left_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.053"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+                     iyy="0.001" iyz="0.0"
+                     izz="0.001"/>
+        </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 1.5708 0"/>
             <geometry>
                 <mesh filename="package://puzzlebot_description/meshes/wheel.stl"/>
             </geometry>
             <material name="wheel_color">
-                <color rgba="0.0 0.5 1.0 1.0"/> 
-            </material> 
+                <color rgba="0.0 0.5 1.0 1.0"/>
+            </material>
         </visual>
         <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <sphere radius="0.05"/>
-                </geometry>    
+                <sphere radius="0.05"/>
             </geometry>
         </collision>
     </link>
@@ -85,17 +109,22 @@
         <parent link="base_link"/>
         <child link="wheel_left_link"/>
         <axis xyz="1 0 0"/>
-        <origin xyz="-0.098 -0.038 0" rpy="0 0 0"/>  
+        <origin xyz="-0.098 -0.038 0" rpy="0 0 0"/>
     </joint>
-
+    
     <!-- Caster Wheel -->
     <link name="caster_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="1.44379265037903E-06"/>
+            <inertia ixx="1.0E-10" ixy="0.0" ixz="0.0"
+                     iyy="1.0E-10" iyz="0.0"
+                     izz="1.0E-10"/>
+        </inertial>
         <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <sphere radius="0.0075"/>
-                </geometry>    
+                <sphere radius="0.0075"/>
             </geometry>
         </collision>
     </link>
@@ -105,5 +134,4 @@
         <child link="caster_link"/>
         <origin xyz="0 0.095 0" rpy="0 0 0"/>
     </joint>
-
 </robot>

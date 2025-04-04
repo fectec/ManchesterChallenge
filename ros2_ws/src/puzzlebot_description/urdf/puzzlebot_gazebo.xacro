@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="puzzlebot">
-
     <gazebo reference="wheel_right_link">
         <mu1>100000000000000.0</mu1>
         <mu2>100000000000000.0</mu2>
@@ -30,5 +29,4 @@
         <minDepth>0.001</minDepth>
         <maxVel>0.1</maxVel>
     </gazebo>
-    
 </robot>
