@@ -10,8 +10,8 @@ class VelocityController(Node):
     def __init__(self):
         super().__init__("velocity_controller")
 
-        self.declare_parameter("wheel_radius", 0.033)
-        self.declare_parameter("wheel_separation", 0.17)
+        self.declare_parameter("wheel_radius", 0.05)
+        self.declare_parameter("wheel_separation", 0.18)
 
         self.wheel_radius = self.get_parameter("wheel_radius").get_parameter_value().double_value
         self.wheel_separation = self.get_parameter("wheel_separation").get_parameter_value().double_value
@@ -40,8 +40,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
