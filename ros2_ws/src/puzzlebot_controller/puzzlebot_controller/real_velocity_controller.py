@@ -35,7 +35,7 @@ class VelocityController(Node):
         # Compute the wheel speeds using the inverse conversion matrix
         wheel_speed = np.matmul(np.linalg.inv(self.speed_conversion), robot_speed)
         # Clamp the wheel speeds between 0.0 and 5.0
-        wheel_speed = np.clip(wheel_speed, 0.0, 5.0)
+        wheel_speed = np.clip(wheel_speed, -5.0, 5.0)
         
         # Create and publish the left and right wheel velocity commands
         left_msg = Float32()
