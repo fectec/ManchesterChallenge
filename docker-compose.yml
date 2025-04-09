@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  simulator:
+    build:
+      context: .
+    image: puzzlebot_image:latest    # Nombre y tag de la imagen creada
+    container_name: puzzlebot_container  # Nombre asignado al contenedor
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/ManchesterChallenge:/root/ManchesterChallenge  # Monta el directorio del repo en el contenedor
+    network_mode: host    # Utiliza la red del host
+    environment:
+      - DISPLAY=${DISPLAY}  # Pasa la variable DISPLAY del host al contenedor
+    stdin_open: true  # Equivalente a -it (mantiene la entrada estándar abierta)
+    tty: true         # Asigna un terminal TTY
+    privileged: true         # Permite acceso total al hardware, necesario para USB
+    devices:
+      - "/dev/bus/usb:/dev/bus/usb"  # Mapea el bus USB completo
+    command: /bin/bash  # Inicia una shell interactiva (puedes cambiar el comando según tus necesidades)
