@@ -4,17 +4,23 @@ services:
   simulator:
     build:
       context: .
-    image: puzzlebot_image:latest    # Nombre y tag de la imagen creada
-    container_name: puzzlebot_container  # Nombre asignado al contenedor
+    image: puzzlebot_image:latest         # Name and tag of the created image
+    container_name: puzzlebot_container   # Name assigned to the container
+
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ~/ManchesterChallenge/ros2_ws/src:/root/ManchesterChallenge/ros2_ws/src  # Monta el directorio del repo en el contenedor
-    network_mode: host    # Utiliza la red del host
+      - ~/ManchesterChallenge/ros2_ws/src:/root/ManchesterChallenge/ros2_ws/src  # Mounts the repository's src directory into the container
+
+    network_mode: host                    # Uses the host's network
+
     environment:
-      - DISPLAY=${DISPLAY}  # Pasa la variable DISPLAY del host al contenedor
-    stdin_open: true  # Equivalente a -it (mantiene la entrada estándar abierta)
-    tty: true         # Asigna un terminal TTY
-    privileged: true         # Permite acceso total al hardware, necesario para USB
+      - DISPLAY=${DISPLAY}               # Passes the host DISPLAY variable to the container
+
+    stdin_open: true                     # Keeps STDIN open (equivalent to -it)
+    tty: true                            # Allocates a TTY
+    privileged: true                     # Grants full hardware access (required for USB)
+
     devices:
-      - "/dev/bus/usb:/dev/bus/usb"  # Mapea el bus USB completo
-    command: /bin/bash  # Inicia una shell interactiva (puedes cambiar el comando según tus necesidades)
+      - "/dev/bus/usb:/dev/bus/usb"      # Maps the entire USB bus
+
+    command: /bin/bash                   # Starts an interactive shell

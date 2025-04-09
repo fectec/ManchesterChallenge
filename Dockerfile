@@ -1,9 +1,10 @@
 FROM osrf/ros:humble-desktop-full
 
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MAKEFLAGS="-j1"
 
-# Actualización e instalación de herramientas y dependencias
+# Update package list and install tools and dependencies
 RUN apt-get update && apt-get install -y \
     git \
     python3-pip \
@@ -26,8 +27,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-joy-teleop \
     && rm -rf /var/lib/apt/lists/*
 
-
-# Instalación de paquetes de Python específicos
+# Install specific Python packages
 RUN pip install --no-cache-dir \
     "numpy<1.25.0" \
     scipy \
@@ -36,5 +36,7 @@ RUN pip install --no-cache-dir \
     opencv-contrib-python-headless==4.6.0.66 \
     transforms3d
 
+# Set default working directory
 WORKDIR /root
-RUN echo "ALL Done"
+
+RUN echo "ALL DONE"
