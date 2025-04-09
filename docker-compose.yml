@@ -8,7 +8,7 @@ services:
     container_name: puzzlebot_container  # Nombre asignado al contenedor
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ~/ManchesterChallenge:/root/ManchesterChallenge  # Monta el directorio del repo en el contenedor
+      - ~/ManchesterChallenge/ros2_ws/src:/root/ManchesterChallenge/ros2_ws/src  # Monta el directorio del repo en el contenedor
     network_mode: host    # Utiliza la red del host
     environment:
       - DISPLAY=${DISPLAY}  # Pasa la variable DISPLAY del host al contenedor
