@@ -3,16 +3,26 @@ open_loop_path_generator:
     waypoints_json: |
       [
         {
-          "x": 1.0,
-          "y": 1.0,
-          "total_time": 20.0
+          "x": 0.2,
+          "y": 0.0,
+          "total_time": 4.0
         },
         {
-          "x": 2.0,
-          "y": 2.0,
-          "total_time": 20.0
+          "x": 0.2,
+          "y": 0.2,
+          "total_time": 4.0
+        },
+        {
+          "x": 0.0,
+          "y": 0.2,
+          "total_time": 4.0
+        },
+        {
+          "x": 0.0,
+          "y": 0.0,
+          "total_time": 4.0
         }
       ]
-    max_linear_speed: 0.15
+    max_linear_speed: 0.16
     max_angular_speed: 0.9
-    safety_margin: 0.0
+    safety_margin: 0.05
