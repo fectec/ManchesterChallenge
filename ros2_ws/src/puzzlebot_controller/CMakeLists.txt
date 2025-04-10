@@ -21,6 +21,7 @@ install(
 install(PROGRAMS
   ${PROJECT_NAME}/simulation_velocity_controller.py
   ${PROJECT_NAME}/real_velocity_controller.py
+  ${PROJECT_NAME}/open_loop_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
