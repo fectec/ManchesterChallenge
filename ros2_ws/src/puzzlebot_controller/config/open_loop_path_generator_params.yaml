@@ -3,31 +3,16 @@ open_loop_path_generator:
     waypoints_json: |
       [
         {
-          "x": 0.0,
-          "y": 0.0,
-          "yaw": 0.0,
-          "control_mode": 1,
-          "execution_time": 1.0
-        },
-        {
           "x": 1.0,
-          "y": 0.0,
-          "yaw": 0.0,
-          "control_mode": 1,
-          "execution_time": 1.0
+          "y": 1.0,
+          "total_time": 20.0
         },
         {
-          "x": 1.7071,
-          "y": 0.7071,
-          "yaw": 0.7854,
-          "control_mode": 0,
-          "target_linear_velocity": 1.0,
-          "target_angular_velocity": 0.7854
+          "x": 2.0,
+          "y": 2.0,
+          "total_time": 20.0
         }
       ]
-    max_linear_speed: 1.5
-    max_angular_speed: 1.8
-    safety_margin: 0.2
-    default_linear_velocity: 1.0
-    default_angular_velocity: 1.2
-    default_execution_time: 5.0
+    max_linear_speed: 0.15
+    max_angular_speed: 0.9
+    safety_margin: 0.0
