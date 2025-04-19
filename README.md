@@ -103,12 +103,16 @@ ros2 launch motor_control motor_control.launch.py
 This setup allowed experimentation with PID parameters and performance evaluation before working with real hardware.
 </p>
 
-<p align="justify">
-In the hardware phase, the <code>setpoint</code> node ran on a PC. The <code>motor</code> node was implemented on an ESP32 microcontroller using microROS. This node handled the full control loop. You can find the code in the <code>micro_ROS</code> folder.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5dd26548-e3d3-464a-b33a-4fd6420e2c73" alt="rqt_graph of the motor_control system" width="600"/>
 </p>
 
 <p align="justify">
-The ESP32 used interrupts to read signals from a quadrature encoder and calculate the motor’s angular velocity. The <code>motor</code> node subscribed to the <code>setpoint</code> topic to receive the target speed. It then computed the error between the reference and the measured velocity, applied the PID algorithm to calculate the control output, and converted this into a PWM signal sent to the H-bridge to drive the motor.
+In the hardware phase, the <code>setpoint</code> node ran on a PC and is located in the <code>motor_control_real</code> package. The <code>motor</code> node was implemented on an ESP32 microcontroller using microROS. This node handled the full control loop. Its code can be found in the <code>micro_ROS</code> folder.
+</p>
+
+<p align="justify">
+The ESP32 used interrupts to read signals from a quadrature encoder and calculate the motor’s angular velocity. The <code>motor</code> node subscribed to the <code>setpoint</code> topic to receive the target speed from the PC. It then computed the error between the reference and the measured velocity, applied the PID algorithm to calculate the control output, and converted this into a PWM signal sent to the H-bridge to drive the motor.
 </p>
 
 <p align="justify">
