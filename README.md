@@ -20,8 +20,12 @@ To implement this:
 
 1. A ROS2 package named `signal_processing` was created.
 2. Inside this package, the `signal_generator` node was developed. It used `math.sin()` and a time variable `t` that incremented on each callback to compute a sinusoidal wave. The resulting signal was published on the `/signal` topic.
-3. Next, the `signal_processor` node was implemented. It subscribed to the `/signal` topic and applied modifications to the incoming signal: a phase shift (using a trigonometric identity), reduced amplitude, and an offset. The processed signal was then published to its own topic.
+3. Next, the `signal_processor` node was implemented. It subscribed to the `/signal` topic and applied modifications to the incoming signal: a phase shift (using a trigonometric identity), reduced amplitude, and an offset. The processed signal was then published to its own topic `/proc_signal`.
 4. A launch file was added to start both nodes and open `rqt_plot` for signal visualization.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/28615f98-54db-4918-b63d-d1fafd96970a" alt="rqt_graph of the signal_processing system" width="600"/>
+</p>
 
 After building the package, the full system can be launched with:
 
