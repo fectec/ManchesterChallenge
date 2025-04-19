@@ -128,11 +128,15 @@ The PID controller is implemented in discrete form. The result is a control outp
 ### ROS2 Tools
 
 <p align="justify">
-Quality of Service (QoS) settings were configured to ensure appropriate communication. The <code>setpoint</code> node used the <code>RELIABLE</code> policy to ensure that reference signals consistently reached the <code>motor</code> node. Meanwhile, the <code>motor</code> node used the <code>BEST_EFFORT</code> policy for non-critical data, such as debugging messages, where high reliability was not necessary.
+The <code>setpoint</code> node publishes reference signals using configurable parameters: timer period, amplitude, and frequency. It supports multiple waveform types—such as sine, square, or step—and can either hold a fixed waveform or cycle through several. All parameters can be updated dynamically at runtime.
 </p>
 
 <p align="justify">
-In addition, a state machine was implemented to establish and maintain the connection with the micro-ROS agent.
+Quality of Service (QoS) settings were configured to ensure appropriate communication. The <code>setpoint</code> node used the <code>RELIABLE</code> policy to guarantee that reference signals consistently reached the <code>motor</code> node, as these signals are critical for controlling a real-world system and must not be lost. On the other hand, the <code>motor</code> node used the <code>BEST_EFFORT</code> policy for non-critical data, such as debugging messages, where occasional packet loss is acceptable. This choice also helps reduce communication latency.
+</p>
+
+<p align="justify">
+In addition, a state machine was implemented to establish and maintain the connection with the micro-ROS agent. In case of disconnection, it attempts to reconnect and reinitialize ROS 2 entities.
 </p>
 
 ### PID Tuning Strategy
@@ -151,4 +155,24 @@ The integral term was then added to eliminate steady-state error, helping the sy
 
 <p align="justify">
 Finally, the derivative term was introduced. D-action provides damping but is highly sensitive to noise. Rapid changes in the signal generate large derivative values, which can amplify measurement noise. Due to the presence of noise in the setup, the D term was applied conservatively.
+</p>
+
+### Sampling Time
+
+<p align="justify">
+The sampling time is set to 50 Hz. In theory, a higher sampling frequency allows the controller to respond more effectively, as it receives more frequent updates about the system’s behavior. However, using ROS introduces overhead that is not present in basic microcontroller setups.
+</p>
+
+<p align="justify">
+In this case, the system is limited by the executor's spin time, which also processes incoming setpoint data from the teleoperator. As a result, the controller cannot operate at a frequency higher than the rate at which new setpoint values can be reliably received.
+</p>
+
+### Performance Evaluation
+
+<p align="justify">
+As an acceptance criterion, the mean square error (MSE) was calculated to evaluate the overall effectiveness of the controller. For the sine wave input, the MSE remained consistently below 1 throughout the test. In the case of the ramp signal, which features less abrupt variation, the MSE stayed below 0.25 — both indicating low error levels.
+</p>
+
+<p align="justify">
+Controller robustness can also be assessed by observing its response to different types of input signals and external disturbances.
 </p>
