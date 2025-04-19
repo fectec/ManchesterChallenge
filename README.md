@@ -32,3 +32,21 @@ After building the package, the full system can be launched with:
 ```bash
 ros2 launch signal_processing signal_processing.launch.py
 ```
+
+The `signal_generator` node later evolved into the `setpoint` node for a simulated PID control system. The simulation included three main nodes:
+
+- `setpoint`: published speed references.
+- `controller`: subscribed to both the setpoint and simulated motor output, computed the error, applied the PID algorithm, and published the control signal.
+- `dc_motor`: simulated motor dynamics using a first-order model, received the control input, updated the speed, and published feedback.
+
+The code was updated to load node parameters directly from the launch file and to allow real-time tuning using `rqt_reconfigure`.
+
+The reference node was extended to support both sinusoidal and square wave signals. The signal type can also be changed in real time through dynamic configuration.
+
+A new launch file was created to start three sets of motor controllers. To improve robustness, node execution order was managed using services, following this sequence:
+
+1. `dc_motor`
+2. `controller`
+3. `setpoint`
+
+This setup allowed experimentation with PID parameters and performance evaluation before working with real hardware.
