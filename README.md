@@ -1,10 +1,8 @@
 # Manchester Challenge
 
-<p align="center">
+<p align="justify">
 Main project developed in collaboration with Manchester Robotics, as part of the undergraduate courses <strong>"Robotics Foundation"</strong> and <strong>"Intelligent Robotics Implementation."</strong>
 </p>
-
-## First Stage: ROS2 DC Motor Control
 
 ## First Stage: ROS2 DC Motor Control
 
