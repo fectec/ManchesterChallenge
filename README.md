@@ -184,3 +184,23 @@ As an acceptance criterion, the mean square error (MSE) was calculated to evalua
 <p align="justify">
 Controller robustness can also be assessed by observing its response to different types of input signals and external disturbances.
 </p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/eab56885-f049-4114-be09-8f46511259e3" alt="Sinusoidal motor_control_real" width="600"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3b999fdd-55f4-4e19-a454-0609846e98f1" alt="Trapezoidal motor_control_real" width="600"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6007ace4-7039-47ea-9856-b5efa52c92ec" alt="Square motor_control_real" width="600"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3db066a4-dfe4-4b69-963f-e69d027736d5" alt="Sawtooth motor_control_real" width="600"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/e6a40984-2402-4f8e-beb8-f71c4af80fd3" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
+</p>
