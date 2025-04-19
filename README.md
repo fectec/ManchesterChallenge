@@ -1,51 +1,13 @@
 # Manchester Challenge
 
-## Crear el contenedor por primera vez:
+Main project developed in collaboration with Manchester Robotics, as part of the undergraduate courses **"Robotics Foundation"** and **"Intelligent Robotics Implementation."**
 
-<div style="border: 1px solid #5bc0de; background-color: #eaf8fc; padding: 10px; border-radius: 5px;">
-  <strong>Nota:</strong> Recordar tener instalado docker-compose. 
-</div>
+## First Stage: ROS2 DC Motor Control
 
->
+The goal was to control the speed of a DC motor attached to one of the wheels of the Puzzlebot — Manchester Robotics’ educational, differential-drive mobile robot.
 
-Correr el siguiente comando en terminal, en el directorio del repositorio.
+Although velocity control for the Puzzlebot’s wheels will later use pre-built facilities provided by Manchester Robotics, it is essential to first understand the core control principles.
 
-```bash
-docker-compose up --build
-```
+One approach is open-loop control, where voltage is applied in proportion to the desired speed. However, this method may not be robust enough, since it lacks self-correction.
 
-Esto creara tanto una imagen llamada **puzzlebot_image** y tambien creara un contenedor llamado **puzzlebot_container** listo para usarse.
-
-Puedes usar el siguiente comando para **borrar** el contenedor con docker-compose.
-
-```bash
-docker-compose down
-```
-
-
-### Comandos para usar el contenedor
-
-Para **iniciar** el contenedor en futuras ocasiones.
-
-```bash
-docker start puzzlebot_container
-```
-
-Para **acceder** al contenedor en futuras ocasiones.
-
-```bash
-docker exec -it puzzlebot_container bash
-```
-
-
-Para **detener** el contenedor en futuras ocasiones.
-
-```bash
-docker stop puzzlebot_container
-```
-
-Para **eliminar** el contenedor en futuras ocasiones.
-
-```bash
-docker rm puzzlebot_container
-```
+For this reason, a closed-loop controller was used: a PID. By applying proportional, integral, and derivative terms, the system can reduce error over time. This ensures that the actual speed converges to the desired value.
