@@ -61,6 +61,10 @@ The <code>signal_generator</code> node later evolved into the <code>setpoint</co
 - <code>dc_motor</code>: simulated motor dynamics using a first-order model, received the control input, updated the speed, and published feedback.
 </p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/433dc63e-382e-4a93-b062-9bd50e7500eb" alt="rqt_graph of the motor_control system" width="600"/>
+</p>
+
 <p align="justify">
 The code was updated to load node parameters directly from the launch file and to allow real-time tuning using <code>rqt_reconfigure</code>.
 </p>
@@ -78,6 +82,14 @@ A new launch file was created to start three sets of motor controllers. To impro
 2. <code>controller</code><br>
 3. <code>setpoint</code>
 </p>
+
+<p align="justify">
+After building the package, the full system can be launched with:
+</p>
+
+```bash
+ros2 launch motor_control motor_control.launch.py 
+```
 
 <p align="justify">
 This setup allowed experimentation with PID parameters and performance evaluation before working with real hardware.
