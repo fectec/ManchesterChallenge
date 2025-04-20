@@ -334,9 +334,9 @@ ros2 launch motor_control_real motor_control_real.launch.py
 
 ### Creating the Container
 
-<div style="border: 1px solid #5bc0de; background-color: #eaf8fc; padding: 10px; border-radius: 5px;">
-  <strong>Note:</strong> Make sure <code>docker-compose</code> is installed.
-</div>
+<p align="justify">
+<strong>Note:</strong> Make sure <code>docker-compose</code> is installed.
+</p>
 
 <p align="justify">
 Open a terminal in the root of the cloned repository and run the following command:
