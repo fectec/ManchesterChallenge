@@ -187,6 +187,10 @@ In this case, the system is limited by the executor's spin time, which also proc
 As an acceptance criterion, the mean square error (MSE) was calculated to evaluate the overall effectiveness of the controller. For the sine wave input, the MSE remained consistently below 1 throughout the test. In the case of the ramp signal, which features less abrupt variation, the MSE stayed below 0.25 — both indicating low error levels.
 </p>
 
+<p align="justify">
+Controller robustness can also be assessed by observing its response to different types of input signals and external disturbances:
+</p>
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/72ee57ff-b9d5-4c43-9965-b9c1da2d8edf" alt="Sinusoidal response - motor_control_real" width="600"/>
 </p>
@@ -204,4 +208,22 @@ As an acceptance criterion, the mean square error (MSE) was calculated to evalua
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
+</p>
+
+##### Execution Guide
+
+<p align="justify">
+The supported board for micro-ROS bare-metal projects using the Arduino IDE is the <a href="https://docs.espressif.com/projects/arduino-esp32/en/latest/boards/ESP32-DevKitC-1.html" target="_blank">ESP32 Dev Module</a>, using the <a href="https://github.com/espressif/arduino-esp32/releases/tag/2.0.2" target="_blank">Arduino core version 2.0.2</a>.
+</p>
+
+<p align="justify">
+First, go to the <a href="https://github.com/micro-ROS/micro_ros_arduino/releases/tag/v2.0.6-humble" target="_blank">micro-ROS v2.0.6-humble release page</a> and download the library ZIP file.
+</p>
+
+<p align="justify">
+Then, include the library in your Arduino project via <code>Sketch → Include Library → Add .ZIP Library...</code>.
+</p>
+
+<p align="justify">
+Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros</code> folder of this repository to the ESP32 board.
 </p>
