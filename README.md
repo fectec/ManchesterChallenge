@@ -265,7 +265,7 @@ Controller robustness can also be assessed by observing its response to differen
 | Power Supply                       | 12V regulated supply                              |
 
 <p align="justify">
-A single 12V power source is used, connected to the 12V input of the L298N. The onboard voltage regulator is enabled using the jumper. The 5V input pin should not be connected to any external supply, as it already outputs 5V through the onboard regulator. This 5V pin can be used as a power source to supply the encoder.
+A single 12V power source is used, connected to the 12V input of the L298N. The onboard voltage regulator is enabled using the jumper. The 5V input pin should not be connected to any external supply, as it already outputs 5V through the onboard regulator. This 5V pin is proposed as a power source to supply the encoder.
 </p>
 
 <p align="center">
