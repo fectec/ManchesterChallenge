@@ -129,7 +129,7 @@ The ESP32 used interrupts to read signals from a quadrature encoder and calculat
 To support system monitoring, the <code>motor</code> node also published key data through dedicated topics: the encoder count, measured angular velocity, error value, and the applied control signal.
 </p>
 
-##### Control Strategy
+### Control Strategy
 
 <p align="justify">
 Angular velocity is measured using a quadrature encoder mounted on the motor shaft. Hardware interrupts capture changes in the encoder channels. The velocity is computed by counting encoder pulses over a fixed time interval. With a resolution of 12 pulses per motor shaft revolution and a 35:1 gear reduction ratio, the pulses are converted into radians per second at the output shaft. The final value is multiplied by 2 to account for full quadrature decoding.
@@ -143,7 +143,7 @@ To improve signal quality, which can be affected by noise, a low-pass filter is 
 The PID controller is implemented in discrete form. The result is a control output that we feed as a PWM signal into a motor driver. The driver then provides a voltage to the motor, influencing its angular velocity. We measure this new velocity, closing the loop. Depending on the sign of the control signal, the motor driver also adjusts the motor’s direction. The entire system operates in a closed-loop control cycle running at a constant frequency of 50 Hz.
 </p>
 
-##### ROS2 Tools
+### ROS2 Tools
 
 <p align="justify">
 The <code>setpoint</code> node publishes reference signals using configurable parameters: timer period, amplitude, and frequency. It supports multiple waveform types—such as sine, square, or step—and can either hold a fixed waveform or cycle through several. All parameters can be updated dynamically at runtime.
@@ -157,7 +157,7 @@ Quality of Service (QoS) settings were configured to ensure appropriate communic
 In addition, a state machine was implemented to establish and maintain the connection with the micro-ROS agent. In case of disconnection, it attempts to reconnect and reinitialize ROS 2 entities.
 </p>
 
-##### PID Tuning Strategy
+### PID Tuning Strategy
 
 <p align="justify">
 To tune the PID, a manual approach was used, where gains were adjusted through trial and error until the system responded satisfactorily. This process was not just guesswork; it followed the following general methodology:
@@ -175,7 +175,7 @@ The integral term was then added to eliminate steady-state error, helping the sy
 Finally, the derivative term was introduced. D-action provides damping but is highly sensitive to noise. Rapid changes in the signal generate large derivative values, which can amplify measurement noise. Due to the presence of noise in the setup, the D term was applied conservatively.
 </p>
 
-##### Sampling Time
+### Sampling Time
 
 <p align="justify">
 The sampling time is set to 50 Hz. In theory, a higher sampling frequency allows the controller to respond more effectively, as it receives more frequent updates about the system’s behavior. However, using ROS introduces overhead that is not present in basic microcontroller setups.
@@ -185,7 +185,7 @@ The sampling time is set to 50 Hz. In theory, a higher sampling frequency allows
 In this case, the system is limited by the executor's spin time, which also processes incoming setpoint data from the teleoperator. As a result, the controller cannot operate at a frequency higher than the rate at which new setpoint values can be reliably received.
 </p>
 
-##### PWM Frequency
+### PWM Frequency
 
 <p align="justify">
 Choosing an appropriate PWM frequency can significantly improve the performance and control of brushed DC motors. When calculating the equivalent voltage delivered by PWM, it is often assumed that the motor responds as if connected to a constant voltage source. However, this is not the case.
@@ -215,7 +215,7 @@ For small hobby motors (typically under 1A), using lower frequencies around 100 
 For this project, a PWM frequency of <strong>100 Hz</strong> was selected.
 </p>
 
-##### Performance Evaluation
+### Performance Evaluation
 
 <p align="justify">
 As an acceptance criterion, the mean square error (MSE) was calculated to evaluate the overall effectiveness of the controller. For the sine wave input, the MSE remained consistently below 1 throughout the test. In the case of the ramp signal, which features less abrupt variation, the MSE stayed below 0.25 — both indicating low error levels.
@@ -244,7 +244,7 @@ Controller robustness can also be assessed by observing its response to differen
   <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
 </p>
 
-##### Bill of Materials & Schematic Diagram
+### Bill of Materials & Schematic Diagram
 
 | Component                          | Description                                       |
 |------------------------------------|-----------------------------------------------    |
@@ -253,13 +253,13 @@ Controller robustness can also be assessed by observing its response to differen
 | MCR2 Brushed DC Motor with Encoder | 6V, 35:1 gear ratio, 176 RPM                      |
 | Power Supply                       | Minimum 6V regulated supply                       |
 
-##### Execution Guide
+### Execution Guide
 
 <p align="justify">
 You will need the <a href="https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/" target="_blank">Arduino IDE</a> and <a href="https://docs.ros.org/en/humble/Installation.html" target="_blank">ROS 2 Humble</a> installed on your system. This project was developed and tested on Ubuntu Linux 22.04 (Jammy Jellyfish).
 </p>
 
-##### micro-ROS
+#### micro-ROS
 
 <p align="justify">
 The supported board for micro-ROS bare-metal projects using the Arduino IDE is the <a href="https://docs.espressif.com/projects/arduino-esp32/en/latest/boards/ESP32-DevKitC-1.html" target="_blank">ESP32 Dev Module</a>, using the <a href="https://github.com/espressif/arduino-esp32/releases/tag/2.0.17" target="_blank">Arduino core version 2.0.17</a>.
@@ -277,7 +277,7 @@ Then, include the library in your Arduino project via <code>Sketch → Include L
 Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros</code> folder of this repository to the ESP32 board.
 </p>
 
-##### ROS 2
+#### ROS 2
 
 <p align="justify">
 To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies, builds the agent, and sets up your workspace.
