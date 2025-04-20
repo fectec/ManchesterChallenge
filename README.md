@@ -400,16 +400,16 @@ At this point, you should have completed the hardware connections of the Puzzleb
 
 <ol>
   <li>Turn on the Puzzlebot’s power supply.</li>
-  <li>Connect to the Puzzlebot's <strong>hackerboard Wi-Fi network</strong> (SSID and password are shown on the OLED screen).</li>
+  <li>Connect to the Puzzlebot's hackerboard Wi-Fi network (SSID and password are shown on the OLED screen).</li>
   <li>Open a web browser and navigate to the default hackerboard IP (commonly <code>192.168.1.1</code>).</li>
   <li>On the configuration page:
     <ul>
-      <li>In <strong>Active Modules</strong>, leave only <code>screen</code> enabled and click <strong>Save</strong>.</li>
-      <li>(Optional) Modify SSID and password under <strong>Network Settings</strong> and click <strong>Save</strong>.</li>
-      <li>Under <strong>Motor-Encoder Settings</strong>, select <strong>Wheel Velocities Control Mode</strong> and click <strong>Save</strong>. This is necessary for joystick teleoperation (later controllers will use other modes).</li>
+      <li>In <strong>Active Modules</strong>, leave only <code>screen</code> enabled and click Save.</li>
+      <li>(Optional) Modify SSID and password under <strong>Network Settings</strong> and click Save.</li>
+      <li>Under <strong>Motor-Encoder Settings</strong>, select <strong>Wheel Velocities Control Mode</strong> and click Save. This is necessary for joystick teleoperation (later controllers will use other mode).</li>
     </ul>
   </li>
-  <li>Click <strong>Change Configuration</strong> and set <code>CommType</code> to <strong>2</strong> (Serial) in <code>config_live.json</code>. Upload the new configuration to the robot.</li>
+  <li>Click <strong>Change Configuration</strong> and set <code>CommType</code> on <code>ROS parameters</code> to <strong>2</strong> (Serial) in <code>config_live.json</code>. Upload the new configuration to the robot.</li>
   <li>Switch to the Puzzlebot's Jetson Wi-Fi network.</li>
   <li>Connect to the Jetson via SSH:
     <br><code>ssh &lt;username&gt;@&lt;jetson_ip&gt;</code>
