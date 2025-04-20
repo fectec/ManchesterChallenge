@@ -4,8 +4,8 @@
   <name>motor_control</name>
   <version>0.1.0</version>
   <description>
-    Provides a modular simulation and control framework for a DC motor, including 
-    PID controller, setpoint generator, and dynamic system model.
+  Provides a modular simulation and control framework for a DC motor, including 
+  PID controller, setpoint generator, and dynamic system model.
   </description>
   <maintainer email="fectec151@gmail.com">fectec</maintainer>
   <license>Apache-2.0</license>

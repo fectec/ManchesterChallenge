@@ -8,13 +8,13 @@ def generate_launch_description():
         package='joy',
         executable='joy_node',
         name='joystick',
-        parameters=[os.path.join(get_package_share_directory('puzzlebot_controller'), 'config', 'joystick_config.yaml')]
+        parameters=[os.path.join(get_package_share_directory('puzzlebot_control'), 'config', 'joystick_config.yaml')]
     )
 
     joystick_teleop = Node(
         package='joy_teleop',
         executable='joy_teleop',
-        parameters=[os.path.join(get_package_share_directory('puzzlebot_controller'), 'config', 'joystick_teleop.yaml')]
+        parameters=[os.path.join(get_package_share_directory('puzzlebot_control'), 'config', 'joystick_teleop.yaml')]
     )
 
     return LaunchDescription([

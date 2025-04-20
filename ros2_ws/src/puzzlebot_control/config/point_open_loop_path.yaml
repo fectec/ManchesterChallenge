@@ -1,5 +1,5 @@
 # --- Time-based "M" --
-open_loop_path_generator:
+point_open_loop_path_generator:
   ros__parameters:
     waypoints_json: |
       [

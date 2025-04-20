@@ -2,10 +2,10 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    localization_node = Node(
-        package='puzzlebot_controller',
-        executable='localization.py',
-        name='localization',
+    odometry_localization_node = Node(
+        package='puzzlebot_control',
+        executable='odometry_localization.py',
+        name='odometry_localization',
         parameters=[{
             'wheel_base': 0.18,
             'wheel_radius': 0.05,
@@ -14,10 +14,10 @@ def generate_launch_description():
         }]
     )
         
-    point_controller_node = Node(
-        package='puzzlebot_controller',
-        executable='point_controller.py',
-        name='point_controller',
+    point_PID_controller_node = Node(
+        package='puzzlebot_control',
+        executable='point_PID_controller.py',
+        name='point_PID_controller',
         parameters=[{
             'Kp_V': 1.25,
             'Ki_V': 0.0008,
@@ -32,6 +32,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        localization_node,
-        point_controller_node
+        odometry_localization_node,
+        point_PID_controller_node
     ])

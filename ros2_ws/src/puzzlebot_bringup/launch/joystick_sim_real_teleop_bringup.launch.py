@@ -8,7 +8,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     puzzlebot_description_dir = get_package_share_directory('puzzlebot_description')
-    puzzlebot_controller_dir = get_package_share_directory('puzzlebot_controller')
+    puzzlebot_control_dir = get_package_share_directory('puzzlebot_control')
 
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -18,19 +18,19 @@ def generate_launch_description():
 
     joystick_teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(puzzlebot_controller_dir, 'launch', 'joystick_teleop.launch.py')
+            os.path.join(puzzlebot_control_dir, 'launch', 'joystick_teleop.launch.py')
         )
     )
 
     simulation_velocity_controller_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(puzzlebot_controller_dir, 'launch', 'simulation_velocity_controller.launch.py')
+            os.path.join(puzzlebot_control_dir, 'launch', 'simulation_velocity_controller.launch.py')
         )
     )
 
-    velocity_controller_launch = IncludeLaunchDescription(
+    real_velocity_controller_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(puzzlebot_controller_dir, 'launch', 'velocity_controller.launch.py')
+            os.path.join(puzzlebot_control_dir, 'launch', 'real_velocity_controller.launch.py')
         )
     )
 
@@ -38,7 +38,7 @@ def generate_launch_description():
         gazebo_launch,
         joystick_teleop_launch,
         simulation_velocity_controller_launch,
-        velocity_controller_launch,
+        real_velocity_controller_launch,
     ])
 
 if __name__ == '__main__':

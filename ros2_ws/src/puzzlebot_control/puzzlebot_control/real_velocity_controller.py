@@ -28,7 +28,7 @@ class VelocityController(Node):
         self.pub_wheel_right = self.create_publisher(Float32, '/VelocitySetR', 10)
        
         # Subscriber to receive Twist messages with linear and angular velocities
-        self.create_subscription(TwistStamped, "puzzlebot_controller/cmd_vel", self.velocity_callback, 10)
+        self.create_subscription(TwistStamped, "puzzlebot_control/cmd_vel", self.velocity_callback, 10)
 
         # Define speed conversion matrix based on robot kinematics
         self.speed_conversion = np.array([

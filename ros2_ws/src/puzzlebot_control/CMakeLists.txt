@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(puzzlebot_controller)
+project(puzzlebot_control)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -24,17 +24,15 @@ install(
 install(PROGRAMS
   ${PROJECT_NAME}/simulation_velocity_controller.py
   ${PROJECT_NAME}/real_velocity_controller.py
-  ${PROJECT_NAME}/open_loop_controller.py
-  ${PROJECT_NAME}/open_loop_path_generator.py
-  ${PROJECT_NAME}/localization.py
-  ${PROJECT_NAME}/point_controller.py
+  ${PROJECT_NAME}/point_open_loop_controller.py
+  ${PROJECT_NAME}/point_open_loop_path_generator.py
+  ${PROJECT_NAME}/odometry_localization.py
+  ${PROJECT_NAME}/point_PID_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

@@ -13,7 +13,7 @@ from launch_ros.actions import PushRosNamespace
 
 def generate_launch_description():
     package = "motor_control"
-    launch_file = "motor_launch.py"
+    launch_file = "motor_control.launch.py"
 
     group1_ns = "group_1"
     group2_ns = "group_2"

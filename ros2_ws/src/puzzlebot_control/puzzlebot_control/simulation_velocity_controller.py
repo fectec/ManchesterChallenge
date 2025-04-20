@@ -25,7 +25,7 @@ class VelocityController(Node):
         # Publisher to send wheel speeds
         self.wheel_cmd_pub = self.create_publisher(Float64MultiArray, "simple_velocity_controller/commands", 10)
         # Subscriber to receive velocity commands
-        self.create_subscription(TwistStamped, "puzzlebot_controller/cmd_vel", self.velocity_callback, 10)
+        self.create_subscription(TwistStamped, "puzzlebot_control/cmd_vel", self.velocity_callback, 10)
 
         # Matrix for velocity conversion from robot to wheel speeds
         self.speed_conversion = np.array([[self.wheel_radius / 2, self.wheel_radius / 2], 

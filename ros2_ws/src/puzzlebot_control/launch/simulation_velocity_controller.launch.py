@@ -17,7 +17,7 @@ def generate_launch_description():
     wheel_radius = LaunchConfiguration('wheel_radius')
     wheel_separation = LaunchConfiguration('wheel_separation')
     
-    joint_state_broadcaster_spawner = Node(
+    joint_state_broadcaster_spawner_node = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
@@ -27,7 +27,7 @@ def generate_launch_description():
         ]
     )
 
-    simple_controller = Node(
+    simple_controller_node = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
@@ -37,8 +37,8 @@ def generate_launch_description():
         ]
     )
 
-    simulation_velocity_controller = Node(
-        package='puzzlebot_controller',
+    simulation_velocity_controller_node = Node(
+        package='puzzlebot_control',
         executable='simulation_velocity_controller.py',
         parameters=[{'wheel_radius': wheel_radius,
                      'wheel_separation': wheel_separation}]
@@ -47,7 +47,7 @@ def generate_launch_description():
     return LaunchDescription([
         wheel_radius_arg,
         wheel_separation_arg,
-        joint_state_broadcaster_spawner,
-        simple_controller,
-        simulation_velocity_controller
+        joint_state_broadcaster_spawner_node,
+        simple_controller_node,
+        simulation_velocity_controller_node
     ])

@@ -23,9 +23,9 @@ def wrap_to_pi(theta):
     return result - math.pi
 
 # ========================
-# Dead Reckoning Node
+# Odometry Localization Node
 # ========================
-class DeadReckoning(Node):
+class OdometryLocalization(Node):
     """
     Estimates the robot's pose (x, y, theta) by dead reckoning, using the angular
     velocities of the left and right wheels of a differential-drive robot. The 
@@ -36,7 +36,7 @@ class DeadReckoning(Node):
     """
 
     def __init__(self):
-        super().__init__('dead_reckoning')
+        super().__init__('odometry_localization')
 
         # Declare parameters for wheel geometry (m), update rate (Hz), and integration period (s)
         self.declare_parameter('wheel_base', 0.18)
@@ -174,7 +174,7 @@ class DeadReckoning(Node):
         
 def main(args=None):
     rclpy.init(args=args)
-    node = DeadReckoning()
+    node = OdometryLocalization()
     
     try:
         rclpy.spin(node)

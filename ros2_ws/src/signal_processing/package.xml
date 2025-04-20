@@ -4,7 +4,7 @@
   <name>signal_processing</name>
   <version>0.1.0</version>
   <description>
-    ROS 2 package that provides signal processing nodes including a signal generator and a signal processor.
+  ROS 2 package that provides signal processing nodes including a signal generator and a signal processor.
   </description>
   <maintainer email="fectec151@gmail.com">fectec</maintainer>
   <license>Apache-2.0</license>

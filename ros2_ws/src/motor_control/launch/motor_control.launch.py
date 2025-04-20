@@ -38,16 +38,8 @@ def generate_launch_description():
         }]
     )
 
-    rqt_node = Node(
-        name='rqt_plot',
-        package='rqt_plot',
-        executable='rqt_plot',
-        arguments=['/setpoint/data', '/motor_output_y/data']
-    )
-
     return LaunchDescription([
         motor_node,
         controller_node,
         setpoint_node,
-        rqt_node
     ])
