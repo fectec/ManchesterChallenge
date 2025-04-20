@@ -114,7 +114,7 @@ This setup allowed experimentation with PID parameters and performance evaluatio
 #### Real-World Motor Control
 
 <p align="justify">
-In the hardware phase, the <code>setpoint</code> node ran on a PC and is located in the <code>motor_control_real</code> package. The <code>motor</code> node was implemented on an ESP32 microcontroller using microROS. This node handled the full control loop. Its code can be found in the <code>micro_ROS</code> folder.
+In the hardware phase, the <code>setpoint</code> node ran on a PC and is located in the <code>motor_control_real</code> package. The <code>motor</code> node was implemented on an ESP32 microcontroller using micro-ROS. This node handled the full control loop. Its code can be found in the <code>micro_ROS</code> folder.
 </p>
 
 <p align="justify">
@@ -212,8 +212,12 @@ Controller robustness can also be assessed by observing its response to differen
 
 ##### Execution Guide
 
+You will need the [Arduino IDE](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/) and ROS 2 Humble installed on your system.
+
+###### micro-ROS
+
 <p align="justify">
-The supported board for micro-ROS bare-metal projects using the Arduino IDE is the <a href="https://docs.espressif.com/projects/arduino-esp32/en/latest/boards/ESP32-DevKitC-1.html" target="_blank">ESP32 Dev Module</a>, using the <a href="https://github.com/espressif/arduino-esp32/releases/tag/2.0.2" target="_blank">Arduino core version 2.0.2</a>.
+The supported board for micro-ROS bare-metal projects using the Arduino IDE is the <a href="https://docs.espressif.com/projects/arduino-esp32/en/latest/boards/ESP32-DevKitC-1.html" target="_blank">ESP32 Dev Module</a>, using the <a href="https://github.com/espressif/arduino-esp32/releases/tag/2.0.17" target="_blank">Arduino core version 2.0.17</a>.
 </p>
 
 <p align="justify">
@@ -226,4 +230,28 @@ Then, include the library in your Arduino project via <code>Sketch → Include L
 
 <p align="justify">
 Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros</code> folder of this repository to the ESP32 board.
+</p>
+
+###### ROS 2
+
+<p align="justify">
+To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies, builds the agent, and sets up your workspace.
+</p>
+
+<p align="justify">
+Once the setup is complete and your system has been rebooted or logged back in (to apply serial port permissions), you can start the micro-ROS agent using the following command:
+</p>
+
+```bash
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
+```
+
+<p align="justify">
+Then, launch the full system using the following command:
+</p>
+
+ros2 launch motor_control_real motor_control_real.launch.py
+
+<p align="justify">
+This launch file starts both the micro-ROS agent and the <code>setpoint</code> node.
 </p>
