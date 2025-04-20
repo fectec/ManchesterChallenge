@@ -287,7 +287,7 @@ A single 12V power source is used, connected to the 12V input of the L298N. The 
 ### Execution Guide
 
 <p align="justify">
-You will need the <a href="https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/" target="_blank">Arduino IDE</a> and <a href="https://docs.ros.org/en/humble/Installation.html" target="_blank">ROS 2 Humble</a> installed on your system. This project was developed and tested on Ubuntu Linux 22.04 (Jammy Jellyfish).
+You will need the <a href="https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/" target="_blank">Arduino IDE</a> and <a href="https://docs.ros.org/en/humble/Installation.html" target="_blank">ROS2 Humble</a> installed on your system. This project was developed and tested on Ubuntu Linux 22.04 (Jammy Jellyfish).
 </p>
 
 #### micro-ROS
