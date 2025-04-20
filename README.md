@@ -251,7 +251,15 @@ Controller robustness can also be assessed by observing its response to differen
 | L298N Motor Driver                 | Dual H-bridge driver for controlling DC motors    |
 | ESP32 Dev Module                   | Microcontroller with Wi-Fi and Bluetooth support  |
 | MCR2 Brushed DC Motor with Encoder | 6V, 35:1 gear ratio, 176 RPM                      |
-| Power Supply                       | Minimum 6V regulated supply                       |
+| Power Supply                       | 12V regulated supply                              |
+
+<p align="justify">
+A single 12V power source is used, connected to the 12V input of the L298N. The onboard voltage regulator is enabled using the jumper. The 5V input pin should not be connected to any external supply, as it already outputs 5V through the onboard regulator. This 5V pin can be used as a power source to supply the encoder.
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f74d4972-ac32-4915-86b3-37d8ae96f6d8" alt="Schematic Diagram" width="80%"/>
+</p>
 
 ### Execution Guide
 
