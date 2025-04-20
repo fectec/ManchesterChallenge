@@ -391,3 +391,50 @@ To <strong>remove</strong> just the container (without Docker Compose):
 ```bash
 docker rm puzzlebot_container
 ```
+
+### Testing Mobility with Joystick Teleoperation
+
+<p align="justify">
+At this point, you should have completed the hardware connections of the Puzzlebot, flashed the <a href="https://tecmx-my.sharepoint.com/personal/mario_mtz_tec_mx/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fmario%5Fmtz%5Ftec%5Fmx%2FDocuments%2Fpuzzlebot%5Ffirmware&ga=1" target="_blank"><strong>hackerboard firmware</strong></a>, and set up the Jetson using the provided <a href="https://manchesterrobotics-my.sharepoint.com/personal/mario_mtz_manchester-robotics_com/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fmario%5Fmtz%5Fmanchester-robotics%5Fcom%2FDocuments%2FManchester%20Robotics%2FTeaching%20and%20learning%2FCourses%2FCADI%20ROS2%2FCADI%20%2D%20Invierno%2FActivities%2Fjetson%5F2gb%5Fubuntu20%2Ezip" target="_blank">Jetson image</a>.
+</p>
+
+<ol>
+  <li>Turn on the Puzzlebot’s power supply.</li>
+  <li>Connect to the Puzzlebot's <strong>hackerboard Wi-Fi network</strong> (SSID and password are shown on the OLED screen).</li>
+  <li>Open a web browser and navigate to the default hackerboard IP (commonly <code>192.168.1.1</code>).</li>
+  <li>On the configuration page:
+    <ul>
+      <li>In <strong>Active Modules</strong>, leave only <code>screen</code> enabled and click <strong>Save</strong>.</li>
+      <li>(Optional) Modify SSID and password under <strong>Network Settings</strong> and click <strong>Save</strong>.</li>
+      <li>Under <strong>Motor-Encoder Settings</strong>, select <strong>Wheel Velocities Control Mode</strong> and click <strong>Save</strong>. This is necessary for joystick teleoperation (later controllers will use other modes).</li>
+    </ul>
+  </li>
+  <li>Click <strong>Change Configuration</strong> and set <code>CommType</code> to <strong>2</strong> (Serial) in <code>config_live.json</code>. Upload the new configuration to the robot.</li>
+  <li>Switch to the Puzzlebot's Jetson Wi-Fi network.</li>
+  <li>Connect to the Jetson via SSH:
+    <br><code>ssh &lt;username&gt;@&lt;jetson_ip&gt;</code>
+  </li>
+  <li>Launch the micro-ROS agent on the Jetson:
+    <br><code>ros2 launch puzzlebot_ros micro_ros_agent.launch.py</code>
+  </li>
+  <li>In another terminal, build the workspace of the cloned repository:
+    <br><code>colcon build --packages-select puzzlebot_control</code>
+  </li>
+  <li>Connect an Xbox One Elite Series controller (or any joystick). You may customize the joystick config files in:
+    <ul>
+      <li><code>puzzlebot_control/config/joystick_config.yaml</code></li>
+      <li><code>puzzlebot_control/config/joystick_teleop.yaml</code></li>
+    </ul>
+  </li>
+  <li>Run the joystick teleoperation launch file:
+    <br><code>ros2 launch puzzlebot_bringup joystick_sim_real_teleop_bringup.launch.py</code>
+  </li>
+</ol>
+
+<p align="justify">
+This will also launch a Gazebo simulation acting as a digital twin. It subscribes to the same velocity command topic as the real Puzzlebot, allowing both to move in sync.
+</p>
+
+<p align="justify">
+In the default control scheme, the left joystick controls linear velocity, and the right joystick controls angular velocity. Holding down the <strong>RB button</strong> is required to send motion commands — otherwise, the robot will remain stationary.
+</p>
