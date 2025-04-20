@@ -417,9 +417,7 @@ At this point, you should have completed the hardware connections of the Puzzleb
   <li>Launch the micro-ROS agent on the Jetson:
     <br><code>ros2 launch puzzlebot_ros micro_ros_agent.launch.py</code>
   </li>
-  <li>In another terminal, build the workspace of the cloned repository:
-    <br><code>colcon build --packages-select puzzlebot_control</code>
-  </li>
+  <li>In another terminal, build the workspace of the cloned repository.</li>
   <li>Connect an Xbox One Elite Series controller (or any joystick). You may customize the joystick config files in:
     <ul>
       <li><code>puzzlebot_control/config/joystick_config.yaml</code></li>
@@ -432,7 +430,7 @@ At this point, you should have completed the hardware connections of the Puzzleb
 </ol>
 
 <p align="justify">
-This will also launch a Gazebo simulation acting as a digital twin. It subscribes to the same velocity command topic as the real Puzzlebot, allowing both to move in sync.
+This will also launch a Gazebo simulation acting as a digital twin. It subscribes to the same velocity command topic as the real Puzzlebot, allowing both to move in approximate synchronization.
 </p>
 
 <p align="justify">
