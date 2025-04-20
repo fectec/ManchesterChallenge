@@ -6,7 +6,7 @@ package_name = 'motor_control_real'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.1.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer='rovestrada',
     maintainer_email='rovestrada@gmail.com',
-    description='This ROS 2 package provides a dynamic setpoint generator designed for controlling a real DC motor.',
+    description='This ROS 2 package provides a dynamic setpoint generator designed for controlling a real DC motor.',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
