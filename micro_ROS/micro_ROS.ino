@@ -29,7 +29,7 @@
 #define ENCODER_A 32              // Encoder channel A pin
 #define ENCODER_B 33              // Encoder channel B pin
 #define ENCODER_RESOLUTION 12.0   // Counts per motor shaft rotation 
-#define ENCODER_GEAR_RATIO 34.0   // Motor shaft rotations per output shaft rotation      
+#define ENCODER_GEAR_RATIO 35.0   // Motor shaft rotations per output shaft rotation      
 
 // H-Bridge (Motor Driver)
 #define PWM_PIN   4               // PWM output pin
