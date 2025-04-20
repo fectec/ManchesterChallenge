@@ -255,7 +255,9 @@ Controller robustness can also be assessed by observing its response to differen
 
 ##### Execution Guide
 
-You will need the [Arduino IDE](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/) and ROS 2 Humble installed on your system.
+<p align="justify">
+You will need the <a href="https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/" target="_blank">Arduino IDE</a> and <a href="https://docs.ros.org/en/humble/Installation.html" target="_blank">ROS 2 Humble</a> installed on your system. This project was developed and tested on Ubuntu Linux 22.04 (Jammy Jellyfish).
+</p>
 
 ##### micro-ROS
 
@@ -290,13 +292,9 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
 ```
 
 <p align="justify">
-Then, launch the full system using the following command:
+After building the <code>motor_control_real</code> package, launch the full system using the following command:
 </p>
 
 ```bash
 ros2 launch motor_control_real motor_control_real.launch.py
 ```
-
-<p align="justify">
-This launch file starts both the micro-ROS agent and the <code>setpoint</code> node.
-</p>
