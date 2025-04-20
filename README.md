@@ -308,7 +308,7 @@ Then, include the library in your Arduino project via <code>Sketch → Include L
 Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros</code> folder of this repository to the ESP32 board.
 </p>
 
-#### ROS 2
+#### ROS2
 
 <p align="justify">
 To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies and builds the agent.
@@ -328,4 +328,66 @@ After building the <code>motor_control_real</code> package, launch the full syst
 
 ```bash
 ros2 launch motor_control_real motor_control_real.launch.py
+```
+
+## Setting Up the Puzzlebot
+
+### Creating the Container
+
+<div style="border: 1px solid #5bc0de; background-color: #eaf8fc; padding: 10px; border-radius: 5px;">
+  <strong>Note:</strong> Make sure <code>docker-compose</code> is installed.
+</div>
+
+<p align="justify">
+Open a terminal in the root of the cloned repository and run the following command:
+</p>
+
+```bash
+docker-compose up --build
+```
+
+<p align="justify">
+This will build a Docker image named <code>puzzlebot_image</code> and create a container named <code>puzzlebot_container</code>, ready to use.
+</p>
+
+<p align="justify">
+To remove the container along with its associated Docker Compose environment:
+</p>
+
+```bash
+docker-compose down
+```
+
+### Common Container Commands
+
+<p align="justify">
+To <strong>start</strong> the container:
+</p>
+
+```bash
+docker start puzzlebot_container
+```
+
+<p align="justify">
+To <strong>access</strong> the container:
+</p>
+
+```bash
+docker exec -it puzzlebot_container bash
+```
+
+<p align="justify">
+To <strong>stop</strong> the container:
+</p>
+
+```bash
+docker stop puzzlebot_container
+```
+
+<p align="justify">
+To <strong>remove</strong> just the container (without Docker Compose):
+</p>
+
+```bash
+docker rm puzzlebot_container
 ```
