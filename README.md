@@ -227,21 +227,32 @@ Controller robustness can also be assessed by observing its response to differen
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/72ee57ff-b9d5-4c43-9965-b9c1da2d8edf" alt="Sinusoidal response - motor_control_real" width="600"/>
+  <br/>
+  <em>Sinusoidal response</em>
 </p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/020a4827-6f40-4a4f-b0ed-40017891402b" alt="Trapezoidal response - motor_control_real" width="600"/>
+  <br/>
+  <em>Trapezoidal response</em>
 </p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c540c398-5d19-478d-a218-51a09e52894a" alt="Square response - motor_control_real" width="600"/>
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/699a22b5-962a-482c-bddf-e7ad668903fe" alt="Ramp response - motor_control_real" width="600"/>
+  <br/>
+  <em>Square response</em>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
+  <img src="https://github.com/user-attachments/assets/699a22b5-962a-482c-bddf-e7ad668903fe" alt="Ramp response - motor_control_real" width="600"/>
+  <br/>
+  <em>Ramp response</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Ramp with disturbances - motor_control_real" width="600"/>
+  <br/>
+  <em>Ramp response with disturbances</em>
 </p>
 
 ### Bill of Materials & Schematic Diagram
@@ -258,7 +269,21 @@ A single 12V power source is used, connected to the 12V input of the L298N. The 
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/f74d4972-ac32-4915-86b3-37d8ae96f6d8" alt="Schematic Diagram" width="80%"/>
+  <img src="https://github.com/user-attachments/assets/1aca4ea6-2e60-4c63-ba52-060e2850ea32" alt="H-Bridge Configuration" width="80%"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/feaa2fc3-0df2-4ed9-ad01-8d1320c6c818" alt="DC Motor with Encoder Pinout" width="80%"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/274eed5f-7f6b-49e3-a248-bafb313af231" alt="ESP32 Dev Module Pinout" width="80%"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/1ceb4dca-2597-4464-bb8e-01e222bff8b5" alt="Power Supply Configuration" width="80%"/>
+  <br/>
+  <em>Power Supply Configuration</em>
 </p>
 
 ### Execution Guide
