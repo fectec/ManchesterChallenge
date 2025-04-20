@@ -260,8 +260,8 @@ Controller robustness can also be assessed by observing its response to differen
 | Component                          | Description                                       |
 |------------------------------------|-----------------------------------------------    |
 | L298N Motor Driver                 | Dual H-bridge driver for controlling DC motors    |
-| ESP32 Dev Module                   | Microcontroller with Wi-Fi and Bluetooth support  |
 | MCR2 Brushed DC Motor with Encoder | 6V, 35:1 gear ratio, 176 RPM                      |
+| ESP32 Dev Module                   | Microcontroller with Wi-Fi and Bluetooth support  |
 | Power Supply                       | 12V regulated supply                              |
 
 <p align="justify">
