@@ -9,7 +9,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "wheel_radius": 0.05,
-            "wheel_separation": 0.18
+            "wheel_separation": 0.18,
+            "max_speed": 5.0
         }]
     )
 

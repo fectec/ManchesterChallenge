@@ -71,7 +71,7 @@ class SetpointPublisherNode(Node):
         Otherwise, cyclically alternates between available waveforms.
         """
         current_time = self.get_clock().now()
-        elapsed_total = (current_time - self.start_time).nanoseconds / 1e9  # Elapsed time in seconds
+        elapsed_total = (current_time - self.start_time).nanoseconds / 1e9  # Elapsed time in s
         
         if self.hold_single:
             # In fixed mode, use the waveform specified in `fixed_wave`

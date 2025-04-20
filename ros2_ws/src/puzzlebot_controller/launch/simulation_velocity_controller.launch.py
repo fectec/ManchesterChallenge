@@ -4,7 +4,6 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-
     wheel_radius_arg = DeclareLaunchArgument(
         "wheel_radius",
         default_value="0.05"

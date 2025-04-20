@@ -105,7 +105,6 @@ class DeadReckoning(Node):
         to update (x, y, theta), publish the odometry message,
         and broadcast the corresponding TF transform.
         """
-
         # Get current time
         now = self.get_clock().now()
 

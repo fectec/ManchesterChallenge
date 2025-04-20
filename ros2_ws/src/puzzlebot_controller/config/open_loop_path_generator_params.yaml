@@ -27,37 +27,3 @@ open_loop_path_generator:
     max_linear_speed: 0.16
     max_angular_speed: 0.9
     safety_margin: 0.1
-
-# --- Speed-based square (commented out) ---
-# open_loop_path_generator:
-#   ros__parameters:
-#     waypoints_json: |
-#       [
-#         {
-#           "x": 0.1,
-#           "y": 0.0,
-#           "rot_speed": 0.6,
-#           "lin_speed": 0.12
-#         },
-#         {
-#           "x": 0.1,
-#           "y": 0.1,
-#           "rot_speed": 0.6,
-#           "lin_speed": 0.12
-#         },
-#         {
-#           "x": 0.0,
-#           "y": 0.1,
-#           "rot_speed": 0.6,
-#           "lin_speed": 0.12
-#         },
-#         {
-#           "x": 0.0,
-#           "y": 0.0,
-#           "rot_speed": 0.6,
-#           "lin_speed": 0.12
-#         }
-#       ]
-#     max_linear_speed: 0.16
-#     max_angular_speed: 0.9
-#     safety_margin: 0.1

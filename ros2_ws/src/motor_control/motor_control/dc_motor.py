@@ -16,7 +16,7 @@ class DCMotorNode(Node):
         super().__init__("DCMotor")
        
         # Declare system parameters
-        self.declare_parameter("sample_time", 1.0)         # System sample time in seconds
+        self.declare_parameter("sample_time", 1.0)         # System sample time (s)
         self.declare_parameter("gain_K", 1.0)              # System gain K
         self.declare_parameter("tau_T", 1.0)               # System time constant Tau
         self.declare_parameter("initial_conditions", 1.0)  # System initial conditions
