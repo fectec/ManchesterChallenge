@@ -181,26 +181,21 @@ In this case, the system is limited by the executor's spin time, which also proc
 As an acceptance criterion, the mean square error (MSE) was calculated to evaluate the overall effectiveness of the controller. For the sine wave input, the MSE remained consistently below 1 throughout the test. In the case of the ramp signal, which features less abrupt variation, the MSE stayed below 0.25 — both indicating low error levels.
 </p>
 
-<p align="justify">
-Controller robustness can also be assessed by observing its response to different types of input signals and external disturbances.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/72ee57ff-b9d5-4c43-9965-b9c1da2d8edf" alt="Sinusoidal response - motor_control_real" width="600"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/eab56885-f049-4114-be09-8f46511259e3" alt="Sinusoidal motor_control_real" width="600"/>
+  <img src="https://github.com/user-attachments/assets/020a4827-6f40-4a4f-b0ed-40017891402b" alt="Trapezoidal response - motor_control_real" width="600"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/3b999fdd-55f4-4e19-a454-0609846e98f1" alt="Trapezoidal motor_control_real" width="600"/>
+  <img src="https://github.com/user-attachments/assets/c540c398-5d19-478d-a218-51a09e52894a" alt="Square response - motor_control_real" width="600"/>
+</p>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/699a22b5-962a-482c-bddf-e7ad668903fe" alt="Ramp response - motor_control_real" width="600"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6007ace4-7039-47ea-9856-b5efa52c92ec" alt="Square motor_control_real" width="600"/>
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/3db066a4-dfe4-4b69-963f-e69d027736d5" alt="Sawtooth motor_control_real" width="600"/>
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/e6a40984-2402-4f8e-beb8-f71c4af80fd3" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
+  <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
 </p>
