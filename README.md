@@ -269,21 +269,19 @@ A single 12V power source is used, connected to the 12V input of the L298N. The 
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1aca4ea6-2e60-4c63-ba52-060e2850ea32" alt="H-Bridge Configuration" width="80%"/>
+  <img src="https://github.com/user-attachments/assets/1aca4ea6-2e60-4c63-ba52-060e2850ea32" alt="H-Bridge Configuration" width="60%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/feaa2fc3-0df2-4ed9-ad01-8d1320c6c818" alt="DC Motor with Encoder Pinout" width="80%"/>
+  <img src="https://github.com/user-attachments/assets/feaa2fc3-0df2-4ed9-ad01-8d1320c6c818" alt="DC Motor with Encoder Pinout" width="60%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/274eed5f-7f6b-49e3-a248-bafb313af231" alt="ESP32 Dev Module Pinout" width="80%"/>
+  <img src="https://github.com/user-attachments/assets/274eed5f-7f6b-49e3-a248-bafb313af231" alt="ESP32 Dev Module Pinout" width="60%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1ceb4dca-2597-4464-bb8e-01e222bff8b5" alt="Power Supply Configuration" width="80%"/>
-  <br/>
-  <em>Power Supply Configuration</em>
+  <img src="https://github.com/user-attachments/assets/1ceb4dca-2597-4464-bb8e-01e222bff8b5" alt="Power Supply Configuration" width="60%"/>
 </p>
 
 ### Execution Guide
