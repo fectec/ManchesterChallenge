@@ -10,6 +10,10 @@ Main project developed in collaboration with Manchester Robotics, as part of the
 The goal was to control the speed of a DC motor attached to one of the wheels of the Puzzlebot — Manchester Robotics’ educational, differential-drive mobile robot.
 </p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6fedd6d5-7e08-441c-bdd8-1f1e3c2dfc30" alt="ROS2 DC Motor Control Layout" width="600"/>
+</p>
+
 <p align="justify">
 Although velocity control for the Puzzlebot’s wheels will later use pre-built facilities provided by Manchester Robotics, it is essential to first understand the core control principles.
 </p>
@@ -250,7 +254,9 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
 Then, launch the full system using the following command:
 </p>
 
+```bash
 ros2 launch motor_control_real motor_control_real.launch.py
+```
 
 <p align="justify">
 This launch file starts both the micro-ROS agent and the <code>setpoint</code> node.
