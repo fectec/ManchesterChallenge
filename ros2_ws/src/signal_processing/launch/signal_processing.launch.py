@@ -2,7 +2,6 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-
     signal_generator_node = Node(package='signal_processing',
                                 executable='signal_generator',
                                 output='screen'
@@ -19,5 +18,4 @@ def generate_launch_description():
 	           arguments=['/signal/data', '/proc_signal/data']
 	           )
     
-    l_d = LaunchDescription([signal_generator_node, signal_processor_node, rqt_node])
-    return l_d
+    return LaunchDescription([signal_generator_node, signal_processor_node, rqt_node])
