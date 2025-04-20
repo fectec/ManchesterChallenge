@@ -280,7 +280,7 @@ Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros<
 #### ROS 2
 
 <p align="justify">
-To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies, builds the agent, and sets up your workspace.
+To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies and builds the agent.
 </p>
 
 <p align="justify">
