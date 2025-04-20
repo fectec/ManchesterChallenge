@@ -2,14 +2,18 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>motor_control</name>
-  <version>0.0.0</version>
-  <description>This package generates a DC motor simulation, setpoint generator and controller nodes for simulating and controlling a DC motor.</description>
+  <version>0.1.0</version>
+  <description>
+    Provides a modular simulation and control framework for a DC motor, including 
+    PID controller, setpoint generator, and dynamic system model.
+  </description>
   <maintainer email="fectec151@gmail.com">fectec</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>ros2launch</depend>
+  <depend>custom_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
