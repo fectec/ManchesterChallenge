@@ -4,14 +4,14 @@
 Main project developed in collaboration with Manchester Robotics, as part of the undergraduate courses <strong>"Robotics Foundation"</strong> and <strong>"Intelligent Robotics Implementation."</strong>
 </p>
 
-## First Stage: ROS2 DC Motor Control
+## First Stage – ROS2 DC Motor Control (Robotics Foundation Course)
 
 <p align="justify">
 The goal was to control the speed of a DC motor attached to one of the wheels of the Puzzlebot — Manchester Robotics’ educational, differential-drive mobile robot.
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6fedd6d5-7e08-441c-bdd8-1f1e3c2dfc30" alt="ROS2 DC Motor Control Layout" width="600"/>
+  <img src="https://github.com/user-attachments/assets/6fedd6d5-7e08-441c-bdd8-1f1e3c2dfc30" alt="ROS2 DC Motor Control Layout" width="80%"/>
 </p>
 
 <p align="justify">
@@ -132,7 +132,7 @@ To support system monitoring, the <code>motor</code> node also published key dat
 ##### Control Strategy
 
 <p align="justify">
-Angular velocity is measured using a quadrature encoder mounted on the motor shaft. Hardware interrupts capture changes in the encoder channels. The velocity is computed by counting encoder pulses over a fixed time interval. With a resolution of 12 pulses per motor shaft revolution and a 34:1 gear reduction ratio, the pulses are converted into radians per second at the output shaft. The final value is multiplied by 2 to account for full quadrature decoding.
+Angular velocity is measured using a quadrature encoder mounted on the motor shaft. Hardware interrupts capture changes in the encoder channels. The velocity is computed by counting encoder pulses over a fixed time interval. With a resolution of 12 pulses per motor shaft revolution and a 35:1 gear reduction ratio, the pulses are converted into radians per second at the output shaft. The final value is multiplied by 2 to account for full quadrature decoding.
 </p>
 
 <p align="justify">
@@ -214,11 +214,20 @@ Controller robustness can also be assessed by observing its response to differen
   <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Sawtooth with disturbances - motor_control_real" width="600"/>
 </p>
 
+### Bill of Materials
+
+| Component                        | Description                                       |
+|----------------------------------|-----------------------------------------------    |
+| L298N Motor Driver               | Dual H-bridge driver for controlling DC motors    |
+| ESP32 Dev Module                 | Microcontroller with Wi-Fi and Bluetooth support  |
+| MCR2 DC Motor with Encoder       | 6V, 35:1 gear ratio, 176 RPM                      |
+| Power Supply                     | Minimum 6V regulated supply                       |
+
 ##### Execution Guide
 
 You will need the [Arduino IDE](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-downloading-and-installing/) and ROS 2 Humble installed on your system.
 
-###### micro-ROS
+##### micro-ROS
 
 <p align="justify">
 The supported board for micro-ROS bare-metal projects using the Arduino IDE is the <a href="https://docs.espressif.com/projects/arduino-esp32/en/latest/boards/ESP32-DevKitC-1.html" target="_blank">ESP32 Dev Module</a>, using the <a href="https://github.com/espressif/arduino-esp32/releases/tag/2.0.17" target="_blank">Arduino core version 2.0.17</a>.
@@ -236,7 +245,7 @@ Then, include the library in your Arduino project via <code>Sketch → Include L
 Finally, flash the <code>micro_ROS.ino</code> file found in the <code>micro_ros</code> folder of this repository to the ESP32 board.
 </p>
 
-###### ROS 2
+##### ROS 2
 
 <p align="justify">
 To set up the micro-ROS agent, run the provided <code>micro_ros_setup</code> script located in the root of this repository. This script installs all dependencies, builds the agent, and sets up your workspace.
