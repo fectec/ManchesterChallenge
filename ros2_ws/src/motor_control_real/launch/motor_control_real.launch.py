@@ -5,6 +5,7 @@ def generate_launch_description():
     micro_ros_agent = Node(name="micro_ros_agent",
                        package='micro_ros_agent',
                        executable='micro_ros_agent',
+                       output='screen',
                        arguments=[
                         'serial',
                         "--dev", '/dev/ttyUSB0',
