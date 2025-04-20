@@ -62,7 +62,7 @@ class SetpointPublisherNode(Node):
         # Set up dynamic parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
 
-        self.get_logger().info("Setpoint Node Started 🚀")
+        self.get_logger().info("Setpoint Node Started.")
 
     def timer_callback(self):
         """
@@ -192,6 +192,7 @@ class SetpointPublisherNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = SetpointPublisherNode()
+    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

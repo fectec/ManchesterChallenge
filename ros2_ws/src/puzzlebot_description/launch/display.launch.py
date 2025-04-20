@@ -9,33 +9,32 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
-    puzzlebot_description_dir = get_package_share_directory("puzzlebot_description")
+    puzzlebot_description_dir = get_package_share_directory('puzzlebot_description')
     
     model_arg = DeclareLaunchArgument(
-        name="model",
-        default_value=os.path.join(puzzlebot_description_dir, "urdf", "puzzlebot.urdf.xacro"),
-        description="Absolute path to robot URDF file"
+        name='model',
+        default_value=os.path.join(puzzlebot_description_dir, 'urdf', 'puzzlebot.urdf.xacro'),
+        description='Absolute path to robot URDF file'
     )
 
-    robot_description = ParameterValue(Command(["xacro ", LaunchConfiguration("model")]), value_type=str)
+    robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]), value_type=str)
 
     robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[{"robot_description": robot_description}]
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        parameters=[{'robot_description': robot_description}]
     )
 
     joint_state_publisher_gui = Node(
-        package="joint_state_publisher_gui",
-        executable="joint_state_publisher_gui"
+        package='joint_state_publisher_gui',
+        executable='joint_state_publisher_gui'
     )
 
     rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="screen",
-        arguments=["-d", os.path.join(puzzlebot_description_dir, "rviz", "display.rviz")]
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', os.path.join(puzzlebot_description_dir, 'rviz', 'display.rviz')]
     )
 
     return LaunchDescription([

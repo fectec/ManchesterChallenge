@@ -234,6 +234,7 @@ class OpenLoopPathGenerator(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = OpenLoopPathGenerator()
+    
     try:
         rclpy.spin(node)
     except:

@@ -153,7 +153,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("Controller Node shutting down gracefully.")
+        pass    
     finally:
         node.destroy_node()
         rclpy.shutdown()

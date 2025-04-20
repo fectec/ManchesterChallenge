@@ -3,13 +3,11 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     signal_generator_node = Node(package='signal_processing',
-                                executable='signal_generator',
-                                output='screen'
+                                executable='signal_generator'
                                 )
 
     signal_processor_node = Node(package='signal_processing',
-                                executable='signal_processor',
-                                output='screen'
+                                executable='signal_processor'
                                 )
                                 
     rqt_node = Node(name='rqt_plot',

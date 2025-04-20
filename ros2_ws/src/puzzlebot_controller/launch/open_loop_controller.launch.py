@@ -11,7 +11,6 @@ def generate_launch_description():
         package='puzzlebot_controller',
         executable='open_loop_path_generator.py',
         name='open_loop_path_generator',
-        output='screen',
         parameters=[param_file]
     )
     
@@ -19,7 +18,9 @@ def generate_launch_description():
         package='puzzlebot_controller',
         executable='open_loop_controller.py',
         name='open_loop_controller',
-        output='screen'
+        parameters=[{
+            'timer_period': 0.1
+        }]
     )
     
     return LaunchDescription([

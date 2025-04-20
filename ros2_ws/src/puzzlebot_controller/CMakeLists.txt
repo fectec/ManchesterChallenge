@@ -27,6 +27,7 @@ install(PROGRAMS
   ${PROJECT_NAME}/open_loop_controller.py
   ${PROJECT_NAME}/open_loop_path_generator.py
   ${PROJECT_NAME}/localization.py
+  ${PROJECT_NAME}/point_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
