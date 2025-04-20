@@ -436,3 +436,63 @@ This will also launch a Gazebo simulation acting as a digital twin. It subscribe
 <p align="justify">
 In the default control scheme, the left joystick controls linear velocity, and the right joystick controls angular velocity. Holding down the <strong>RB button</strong> is required to send motion commands — otherwise, the robot will remain stationary.
 </p>
+
+## Second Stage – Puzzlebot Control (Intelligent Robotics Implementation Course)
+
+<p align="justify">
+As mentioned before, on the hackerboard configuration page, under <strong>Motor-Encoder Settings</strong>, select <strong>Robot Velocities Control Mode</strong> and click Save.
+</p>
+
+### Point-to-Point Open Loop Controller
+
+<p align="justify">
+A basic open-loop controller was implemented to command the Puzzlebot to move between predefined waypoints. The controller publishes linear and angular velocities directly for specific durations.
+
+<p align="justify">
+You can configure a path in <code>puzzlebot_control/config/point_open_loop_path.yaml</code>. Each waypoint should define its <code>x</code> and <code>y</code> coordinates and either a target duration or a pair of speed commands. Two modes are available:
+</p>
+
+<ul>
+  <li>
+    <strong>Time-based mode</strong>: specify <code>total_time</code> per waypoint to automatically compute the required linear and angular velocities.
+  </li>
+  <li>
+    <strong>Speed-based mode</strong>: specify <code>lin_speed</code> and <code>rot_speed</code> per waypoint, and the system will compute the required duration.
+  </li>
+</ul>
+
+<p align="justify">
+In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>max_angular_speed</code>, and a <code>safety_margin</code>. The safety margin adds a small delay after each command to improve robustness against drift.
+</p>
+
+<p><strong>Example – Time-based Mode</strong></p>
+
+<pre><code>point_open_loop_path_generator:
+  ros__parameters:
+    waypoints_json: |
+      [
+        { "x": 0.0, "y": 0.5, "total_time": 10.0 },
+        { "x": -0.5, "y": 0.0, "total_time": 10.0 },
+        { "x": -1.0, "y": 0.5, "total_time": 10.0 },
+        { "x": -1.0, "y": 0.0, "total_time": 10.0 }
+      ]
+    max_linear_speed: 0.16
+    max_angular_speed: 0.9
+    safety_margin: 0.1
+</code></pre>
+
+<p><strong>Example – Speed-based Mode</strong></p>
+
+<pre><code>point_open_loop_path_generator:
+  ros__parameters:
+    waypoints_json: |
+      [
+        { "x": 0.1, "y": 0.0, "lin_speed": 0.12, "rot_speed": 0.6 },
+        { "x": 0.1, "y": 0.1, "lin_speed": 0.12, "rot_speed": 0.6 },
+        { "x": 0.0, "y": 0.1, "lin_speed": 0.12, "rot_speed": 0.6 },
+        { "x": 0.0, "y": 0.0, "lin_speed": 0.12, "rot_speed": 0.6 }
+      ]
+    max_linear_speed: 0.16
+    max_angular_speed: 0.9
+    safety_margin: 0.1
+</code></pre>
