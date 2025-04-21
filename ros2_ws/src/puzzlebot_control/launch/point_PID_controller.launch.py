@@ -30,8 +30,12 @@ def generate_launch_description():
             'Kp_Omega': 0.2,
             'Ki_Omega': 0.0,
             'Kd_Omega': 0.0,
-            'position_tolerance': 0.1,
-            'angle_tolerance': 0.1,
+            'position_tolerance': 0.05,
+            'angle_tolerance': 0.05,
+            'min_linear_vel': 0.05, 
+            'max_linear_vel': 0.16,
+            'min_angular_vel': 0.1,
+            'max_angular_vel': 0.9,
             'update_rate': 100.0
         }]
     )
