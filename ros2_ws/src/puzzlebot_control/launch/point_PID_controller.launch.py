@@ -1,7 +1,12 @@
+import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    pkg_share = get_package_share_directory('puzzlebot_control')
+    param_file = os.path.join(pkg_share, 'config', 'point_PID_path.yaml')
+
     odometry_localization_node = Node(
         package='puzzlebot_control',
         executable='odometry_localization.py',
@@ -9,8 +14,8 @@ def generate_launch_description():
         parameters=[{
             'wheel_base': 0.18,
             'wheel_radius': 0.05,
-            'update_rate': 200.0,
-            'integration_period': 0.01
+            'update_rate': 100.0,
+            'integration_period': 0.02
         }]
     )
         
@@ -19,19 +24,27 @@ def generate_launch_description():
         executable='point_PID_controller.py',
         name='point_PID_controller',
         parameters=[{
-            'Kp_V': 1.25,
-            'Ki_V': 0.0008,
-            'Kd_V': 0.0004,
-            'Kp_Omega': 1.6,
-            'Ki_Omega': 0.0008,
-            'Kd_Omega': 0.0004,
-            'position_tolerance': 0.01,
-            'angle_tolerance': 0.01,
-            'update_rate': 200.0
+            'Kp_V': 0.2,
+            'Ki_V': 0.0,
+            'Kd_V': 0.0,
+            'Kp_Omega': 0.2,
+            'Ki_Omega': 0.0,
+            'Kd_Omega': 0.0,
+            'position_tolerance': 0.1,
+            'angle_tolerance': 0.1,
+            'update_rate': 100.0
         }]
+    )
+
+    point_pid_path_generator_node = Node(
+        package='puzzlebot_control',
+        executable='point_PID_path_generator.py',     
+        name='point_PID_path_generator',
+        parameters=[param_file]                    
     )
 
     return LaunchDescription([
         odometry_localization_node,
-        point_PID_controller_node
+        point_PID_controller_node,
+        point_pid_path_generator_node
     ])

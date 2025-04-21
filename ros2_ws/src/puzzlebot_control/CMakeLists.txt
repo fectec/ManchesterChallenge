@@ -28,6 +28,7 @@ install(PROGRAMS
   ${PROJECT_NAME}/point_open_loop_path_generator.py
   ${PROJECT_NAME}/odometry_localization.py
   ${PROJECT_NAME}/point_PID_controller.py
+  ${PROJECT_NAME}/point_PID_path_generator.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

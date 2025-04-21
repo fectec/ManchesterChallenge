@@ -8,22 +8,22 @@ from custom_interfaces.msg import OpenLoopPose
 from geometry_msgs.msg import Quaternion
 
 def normalize_angle_diff(current_angle, goal_angle):
-    """Normalize the angle difference to the range [-pi, pi]."""
+    # Normalize the angle difference to the range [-pi, pi]
     diff = goal_angle - current_angle
     diff = (diff + math.pi) % (2 * math.pi) - math.pi
     return diff
 
 def angle_diff_signed(sign, diff):
-    """Return signed angle difference based on the sign."""
+    # Return signed angle difference based on the sign
     return diff if sign>0 else -diff
 
-def yaw_to_quaternion(angle):
-    """Convert yaw angle to quaternion for orientation."""
+def yaw_to_quaternion(yaw: float) -> Quaternion:
+    # Convert a yaw angle (radians) into a quaternion message
     q = Quaternion()
     q.x = 0.0
     q.y = 0.0
-    q.z = math.sin(angle / 2.0)
-    q.w = math.cos(angle / 2.0)
+    q.z = math.sin(yaw / 2.0)
+    q.w = math.cos(yaw / 2.0)
     return q
 
 class OpenLoopPathGenerator(Node):
