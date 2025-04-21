@@ -394,10 +394,6 @@ docker rm puzzlebot_container
 
 ### Testing Mobility with Joystick Teleoperation
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="600"/>
-</p>
-
 <p align="justify">
 At this point, you should have completed the hardware connections of the Puzzlebot, flashed the <a href="https://tecmx-my.sharepoint.com/personal/mario_mtz_tec_mx/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fmario%5Fmtz%5Ftec%5Fmx%2FDocuments%2Fpuzzlebot%5Ffirmware&ga=1" target="_blank"><strong>hackerboard firmware</strong></a>, and configured the Jetson using the provided <a href="https://manchesterrobotics-my.sharepoint.com/personal/mario_mtz_manchester-robotics_com/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fmario%5Fmtz%5Fmanchester-robotics%5Fcom%2FDocuments%2FManchester%20Robotics%2FTeaching%20and%20learning%2FCourses%2FCADI%20ROS2%2FCADI%20%2D%20Invierno%2FActivities%2Fjetson%5F2gb%5Fubuntu20%2Ezip" target="_blank">Jetson image</a> and its hotspot network.
 </p>
@@ -435,6 +431,10 @@ At this point, you should have completed the hardware connections of the Puzzleb
 
 <p align="justify">
 This will also launch a Gazebo simulation acting as a digital twin. It subscribes to the same velocity command topic as the real Puzzlebot, allowing both to move in approximate synchronization.
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="300"/>
 </p>
 
 <p align="justify">
