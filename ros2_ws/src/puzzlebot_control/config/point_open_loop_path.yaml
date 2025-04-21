@@ -5,23 +5,23 @@ point_open_loop_path_generator:
       [
         {
           "x": 0.0,
-          "y": 0.5,
-          "total_time": 10.0
+          "y": 0.25,
+          "total_time": 8.0
+        },
+        {
+          "x": -0.25,
+          "y": 0.0,
+          "total_time": 8.0
+        },
+        {
+          "x": -0.5,
+          "y": 0.25,
+          "total_time": 8.0
         },
         {
           "x": -0.5,
           "y": 0.0,
-          "total_time": 10.0
-        },
-        {
-          "x": -1.0,
-          "y": 0.5,
-          "total_time": 10.0
-        },
-        {
-          "x": -1.0,
-          "y": 0.0,
-          "total_time": 10.0
+          "total_time": 8.0
         }
       ]
     max_linear_speed: 0.16
