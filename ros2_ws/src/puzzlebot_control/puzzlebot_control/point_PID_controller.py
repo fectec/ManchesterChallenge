@@ -150,6 +150,7 @@ class PIDPointController(Node):
 
         # Timer for the control loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+        self.last_log_time = 0.0
 
         self.get_logger().info("PID Position Controller Node Started.")
     
@@ -211,12 +212,12 @@ class PIDPointController(Node):
         if not self.goal_received:
             return
         
-        now = self.get_clock().now().nanoseconds * 1e-9
+        now_time = self.get_clock().now().nanoseconds * 1e-9
         if self.last_time is None:
-            self.last_time = now
+            self.last_time = now_time
             return
         
-        dt = now - self.last_time
+        dt = now_time - self.last_time
         if dt < 1.0 / self.update_rate:
             return
 
@@ -254,7 +255,7 @@ class PIDPointController(Node):
         # Save errors and time for the next iteration
         self.last_signed_e_d = signed_e_d
         self.last_e_theta = e_theta
-        self.last_time = now
+        self.last_time = now_time
 
         # Apply nonlinearity handling
         V = self.apply_velocity_constraints(V, self.min_linear_vel, self.max_linear_vel)
@@ -266,11 +267,10 @@ class PIDPointController(Node):
         cmd.angular.z = Omega
         self.cmd_pub.publish(cmd)
 
-        # Debug info - periodically log control efforts and errors
-        if int(now * 10) % 50 == 0:  # Log approximately every 5 seconds
-            self.get_logger().debug(
-                f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
-            )
+        # Debug info
+        self.get_logger().debug(
+            f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
+        )
 
 def main(args=None):
     rclpy.init(args=args)

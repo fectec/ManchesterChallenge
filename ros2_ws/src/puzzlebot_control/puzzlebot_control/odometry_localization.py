@@ -88,6 +88,7 @@ class OdometryLocalization(Node):
 
         # Timer for periodic updates
         self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
+        self.last_log_time = 0.0
 
         self.get_logger().info("Differential-Drive Dead-Reckoning Node Started.")
 
@@ -107,17 +108,18 @@ class OdometryLocalization(Node):
         """
         # Get current time
         now = self.get_clock().now()
+        now_time = now.nanoseconds * 1e-9
 
         # Initialization on first run
         if self.last_time is None:
-            self.last_time = now
+            self.last_time = now_time
             return
 
         # Compute elapsed time since last update (s); skip integration if dt is less than integration_period
-        dt = (now - self.last_time).nanoseconds * 1e-9
+        dt = now_time - self.last_time
         if dt < self.integration_period:
             return
-        self.last_time = now
+        self.last_time = now_time
 
         # Convert wheel angular velocities (rad/s) to linear speeds (m/s)
         v_r = self.wheel_radius * self.omega_r

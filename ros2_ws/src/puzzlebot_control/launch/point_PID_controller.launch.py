@@ -14,7 +14,7 @@ def generate_launch_description():
         parameters=[{
             'wheel_base': 0.18,
             'wheel_radius': 0.05,
-            'update_rate': 100.0,
+            'update_rate': 50.0,
             'integration_period': 0.02
         }]
     )
@@ -36,7 +36,7 @@ def generate_launch_description():
             'max_linear_vel': 0.16,
             'min_angular_vel': 0.1,
             'max_angular_vel': 0.9,
-            'update_rate': 100.0
+            'update_rate': 25.0
         }]
     )
 
