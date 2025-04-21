@@ -79,8 +79,8 @@ class PIDPointController(Node):
         self.declare_parameter('Kd_Omega', 0.0)
 
         # Declare stop tolerances (absolute thresholds)
-        self.declare_parameter('position_tolerance', 0.01)
-        self.declare_parameter('angle_tolerance', 0.01)
+        self.declare_parameter('position_tolerance', 0.05)
+        self.declare_parameter('angle_tolerance', 0.05)
 
         # Declare velocity constraints for nonlinearity handling
         self.declare_parameter('min_linear_vel', 0.05)  # Minimum linear velocity to overcome friction
@@ -89,7 +89,7 @@ class PIDPointController(Node):
         self.declare_parameter('max_angular_vel', 0.9)  # Maximum safe angular velocity
 
         # Declare control loop update rate (Hz)
-        self.declare_parameter('update_rate', 200.0)
+        self.declare_parameter('update_rate', 100.0)
 
         # Load parameters
         self.Kp_V = self.get_parameter('Kp_V').get_parameter_value().double_value
