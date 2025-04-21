@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-#!/usr/bin/env python3
-
 import rclpy
 import math
 import numpy as np
@@ -86,9 +84,9 @@ class PIDPointController(Node):
 
         # Declare velocity constraints for nonlinearity handling
         self.declare_parameter('min_linear_vel', 0.05)  # Minimum linear velocity to overcome friction
-        self.declare_parameter('max_linear_vel', 0.5)   # Maximum safe linear velocity
+        self.declare_parameter('max_linear_vel', 0.16)  # Maximum safe linear velocity
         self.declare_parameter('min_angular_vel', 0.1)  # Minimum angular velocity to overcome inertia
-        self.declare_parameter('max_angular_vel', 1.0)  # Maximum safe angular velocity
+        self.declare_parameter('max_angular_vel', 0.9)  # Maximum safe angular velocity
 
         # Declare control loop update rate (Hz)
         self.declare_parameter('update_rate', 200.0)
