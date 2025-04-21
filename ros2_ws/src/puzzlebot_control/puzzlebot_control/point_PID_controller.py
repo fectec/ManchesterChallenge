@@ -174,7 +174,6 @@ class PIDPointController(Node):
         response.success = bool(self.goal_done)
         if self.goal_done:
             self.get_logger().info("GoalReached service.")
-            self.goal_done = False   
         return response
     
     def control_loop(self):
