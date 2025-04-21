@@ -11,7 +11,7 @@ The goal was to control the speed of a brushed DC motor attached to one of the w
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6fedd6d5-7e08-441c-bdd8-1f1e3c2dfc30" alt="ROS2 DC Motor Control Layout" width="80%"/>
+  <img src="https://github.com/user-attachments/assets/6fedd6d5-7e08-441c-bdd8-1f1e3c2dfc30" alt="ROS2 DC Motor Control Layout" width="50%"/>
 </p>
 
 <p align="justify">
@@ -250,9 +250,9 @@ Controller robustness can also be assessed by observing its response to differen
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Ramp with disturbances - motor_control_real" width="600"/>
+  <img src="https://github.com/user-attachments/assets/dba5a767-9547-4973-af30-dc7df23b11a2" alt="Response with disturbances - motor_control_real" width="600"/>
   <br/>
-  <em>Ramp response with disturbances</em>
+  <em>Response with disturbances</em>
 </p>
 
 ### Bill of Materials & Schematic Diagram
@@ -269,19 +269,19 @@ A single 12V power source is used, connected to the 12V input of the L298N. The 
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1aca4ea6-2e60-4c63-ba52-060e2850ea32" alt="H-Bridge Configuration" width="60%"/>
+  <img src="https://github.com/user-attachments/assets/1aca4ea6-2e60-4c63-ba52-060e2850ea32" alt="H-Bridge Configuration" width="40%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/feaa2fc3-0df2-4ed9-ad01-8d1320c6c818" alt="DC Motor with Encoder Pinout" width="60%"/>
+  <img src="https://github.com/user-attachments/assets/feaa2fc3-0df2-4ed9-ad01-8d1320c6c818" alt="DC Motor with Encoder Pinout" width="40%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/274eed5f-7f6b-49e3-a248-bafb313af231" alt="ESP32 Dev Module Pinout" width="60%"/>
+  <img src="https://github.com/user-attachments/assets/274eed5f-7f6b-49e3-a248-bafb313af231" alt="ESP32 Dev Module Pinout" width="40%"/>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1ceb4dca-2597-4464-bb8e-01e222bff8b5" alt="Power Supply Configuration" width="60%"/>
+  <img src="https://github.com/user-attachments/assets/1ceb4dca-2597-4464-bb8e-01e222bff8b5" alt="Power Supply Configuration" width="40%"/>
 </p>
 
 ### Execution Guide
@@ -434,7 +434,7 @@ This will also launch a Gazebo simulation acting as a digital twin. It subscribe
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="300"/>
+  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="400"/>
 </p>
 
 <p align="justify">
@@ -466,7 +466,7 @@ You can configure a path in <code>puzzlebot_control/config/point_open_loop_path.
 </ul>
 
 <p align="justify">
-In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>max_angular_speed</code>, and a <code>safety_margin</code>. The safety margin adds a small delay after each command to improve robustness against drift.
+In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>max_angular_speed</code>, and a <code>safety_margin</code>. The safety margin adds an extra quantity to each command to improve robustness against drift.
 </p>
 
 <p><strong>Example – Time-based Mode</strong></p>
