@@ -84,6 +84,12 @@ class PIDPointController(Node):
         self.declare_parameter('position_tolerance', 0.01)
         self.declare_parameter('angle_tolerance', 0.01)
 
+        # Declare velocity constraints for nonlinearity handling
+        self.declare_parameter('min_linear_vel', 0.05)  # Minimum linear velocity to overcome friction
+        self.declare_parameter('max_linear_vel', 0.5)   # Maximum safe linear velocity
+        self.declare_parameter('min_angular_vel', 0.1)  # Minimum angular velocity to overcome inertia
+        self.declare_parameter('max_angular_vel', 1.0)  # Maximum safe angular velocity
+
         # Declare control loop update rate (Hz)
         self.declare_parameter('update_rate', 200.0)
 
@@ -98,6 +104,12 @@ class PIDPointController(Node):
 
         self.position_tolerance = self.get_parameter('position_tolerance').get_parameter_value().double_value
         self.angle_tolerance = self.get_parameter('angle_tolerance').get_parameter_value().double_value
+        
+        self.min_linear_vel = self.get_parameter('min_linear_vel').get_parameter_value().double_value
+        self.max_linear_vel = self.get_parameter('max_linear_vel').get_parameter_value().double_value
+        self.min_angular_vel = self.get_parameter('min_angular_vel').get_parameter_value().double_value
+        self.max_angular_vel = self.get_parameter('max_angular_vel').get_parameter_value().double_value
+        
         self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
 
         # Robot state
@@ -142,7 +154,27 @@ class PIDPointController(Node):
         self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
 
         self.get_logger().info("PID Position Controller Node Started.")
-
+    
+    def apply_velocity_constraints(self, velocity, min_vel, max_vel):
+        """
+        Apply minimum and maximum velocity constraints to handle nonlinearity.
+        
+        If the absolute value of velocity is below min_vel but not zero, set it to min_vel
+        while preserving the sign. Limit the velocity to max_vel.
+        """
+        if abs(velocity) < 0.001:  # Effectively zero
+            return 0.0
+            
+        # Apply minimum threshold (to overcome friction/inertia)
+        if abs(velocity) < min_vel:
+            velocity = min_vel * (1 if velocity > 0 else -1)
+            
+        # Apply maximum limit (saturation)
+        if abs(velocity) > max_vel:
+            velocity = max_vel * (1 if velocity > 0 else -1)
+            
+        return velocity
+    
     def goal_callback(self, msg):
         # Receive a new goal and reset PID state
         self.setpoint.x = msg.pose.position.x
@@ -226,16 +258,21 @@ class PIDPointController(Node):
         self.last_e_theta = e_theta
         self.last_time = now
 
+        # Apply nonlinearity handling
+        V = self.apply_velocity_constraints(V, self.min_linear_vel, self.max_linear_vel)
+        Omega = self.apply_velocity_constraints(Omega, self.min_angular_vel, self.max_angular_vel)
+
         # Publish the computed command
         cmd = Twist()
         cmd.linear.x = V
         cmd.angular.z = Omega
         self.cmd_pub.publish(cmd)
 
-    def destroy_node(self):
-        """Cancel timer on shutdown."""
-        self.timer.cancel()
-        super().destroy_node()
+        # Debug info - periodically log control efforts and errors
+        if int(now * 10) % 50 == 0:  # Log approximately every 5 seconds
+            self.get_logger().debug(
+                f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
+            )
 
 def main(args=None):
     rclpy.init(args=args)

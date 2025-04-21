@@ -3,8 +3,8 @@ point_PID_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 1.0, "y": 0.0 },
+        { "x": 0.2, "y": 0.0 },
         { "x": 0.25, "y": 0.433 },
         { "x": 0.0, "y": 0.0 }
       ]
-    timer_interval: 0.01
+    timer_interval: 0.005
