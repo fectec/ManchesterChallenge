@@ -485,6 +485,10 @@ In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>m
     safety_margin: 0.1
 </code></pre>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dd89c229-a619-41d2-bc90-199b474b8bc5" alt="Point-to-Point Open Loop Control Demo" width="400"/>
+</p>
+
 <p><strong>Example – Speed-based Mode</strong></p>
 
 <pre><code>point_open_loop_path_generator:
