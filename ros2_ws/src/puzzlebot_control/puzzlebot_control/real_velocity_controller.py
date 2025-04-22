@@ -23,7 +23,7 @@ class VelocityController(Node):
         self.wheel_separation = self.get_parameter("wheel_separation").get_parameter_value().double_value
         self.max_speed = self.get_parameter("max_speed").get_parameter_value().double_value
 
-        # Publishers for left and right wheel velocities (Float32 values from 0.0 to 5.0)
+        # Publishers for left and right wheel velocities
         self.pub_wheel_left = self.create_publisher(Float32, '/VelocitySetL', 10)
         self.pub_wheel_right = self.create_publisher(Float32, '/VelocitySetR', 10)
        

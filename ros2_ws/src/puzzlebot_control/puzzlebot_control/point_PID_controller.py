@@ -3,13 +3,13 @@
 import rclpy
 import math
 import numpy as np
+import time
 
 from rclpy.node import Node
 from rclpy import qos
 from geometry_msgs.msg import Twist, Pose2D
 from nav_msgs.msg import Odometry
-from custom_interfaces.msg import PIDGoalPose
-from custom_interfaces.srv import GoalReached
+from custom_interfaces.srv import NextWaypoint
 
 # ========================
 # Utility Functions
@@ -46,8 +46,11 @@ class PIDPointController(Node):
     robot toward a desired goal pose (x_g, y_g, theta_g) based on current odometry (x_r, y_r, theta_r).
 
     Subscribes to:
-      - /goal (custom_interfaces/PIDGoalPose): Desired goal pose, containing position and yaw.
       - /odom (nav_msgs/Odometry): Current robot pose and orientation
+    
+    Service Clients:
+      - /next_waypoint (custom_interfaces/srv/NextWaypoint): Requests the next waypoint
+    
     Publishes to:
       - /cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
 
@@ -55,7 +58,7 @@ class PIDPointController(Node):
       - Compute global position errors:
             e_x = x_g - x_r
             e_y = y_g - y_r
-      - Compute the signed distance error (projected along the robot’s forward direction):
+      - Compute the signed distance error (projected along the robot's forward direction):
             signed_e_d = e_x*cos(theta_r) + e_y*sin(theta_r)
       - Compute the angular error (wrapped to [-pi, pi]):
             e_theta = wrap_to_pi(atan2(e_y, e_x) - theta_r)
@@ -67,7 +70,7 @@ class PIDPointController(Node):
     """
 
     def __init__(self):
-        super().__init__('point_controller')
+        super().__init__('pid_point_controller')
 
         # Declare PID parameters
         self.declare_parameter('Kp_V', 0.1)
@@ -79,10 +82,10 @@ class PIDPointController(Node):
         self.declare_parameter('Kd_Omega', 0.0)
 
         # Declare stop tolerances (absolute thresholds)
-        self.declare_parameter('position_tolerance', 0.05)
-        self.declare_parameter('angle_tolerance', 0.05)
+        self.declare_parameter('goal_tolerance', 0.05)
+        self.declare_parameter('heading_tolerance', 0.05)
 
-        # Declare velocity constraints for nonlinearity handling
+        # Declare velocity constraints (m/s & rad/s) for nonlinearity handling
         self.declare_parameter('min_linear_vel', 0.05)  # Minimum linear velocity to overcome friction
         self.declare_parameter('max_linear_vel', 0.16)  # Maximum safe linear velocity
         self.declare_parameter('min_angular_vel', 0.1)  # Minimum angular velocity to overcome inertia
@@ -90,6 +93,9 @@ class PIDPointController(Node):
 
         # Declare control loop update rate (Hz)
         self.declare_parameter('update_rate', 100.0)
+        
+        # Declare auto-request parameter
+        self.declare_parameter('auto_request_next', True)
 
         # Load parameters
         self.Kp_V = self.get_parameter('Kp_V').get_parameter_value().double_value
@@ -100,8 +106,8 @@ class PIDPointController(Node):
         self.Ki_Omega = self.get_parameter('Ki_Omega').get_parameter_value().double_value
         self.Kd_Omega = self.get_parameter('Kd_Omega').get_parameter_value().double_value
 
-        self.position_tolerance = self.get_parameter('position_tolerance').get_parameter_value().double_value
-        self.angle_tolerance = self.get_parameter('angle_tolerance').get_parameter_value().double_value
+        self.goal_tolerance = self.get_parameter('goal_tolerance').get_parameter_value().double_value
+        self.heading_tolerance = self.get_parameter('heading_tolerance').get_parameter_value().double_value
         
         self.min_linear_vel = self.get_parameter('min_linear_vel').get_parameter_value().double_value
         self.max_linear_vel = self.get_parameter('max_linear_vel').get_parameter_value().double_value
@@ -109,50 +115,50 @@ class PIDPointController(Node):
         self.max_angular_vel = self.get_parameter('max_angular_vel').get_parameter_value().double_value
         
         self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
+        self.auto_request_next = self.get_parameter('auto_request_next').get_parameter_value().bool_value
 
         # Robot state
         self.current_pose = Pose2D()
         self.setpoint = Pose2D()
-        self.goal_received = False
-        self.goal_done = False
+        self.goal_active = False
+        self.current_waypoint_id = -1
+        self.path_completed = False
         
-        # PID internals (using signed error for linear control)
+        # PID internals 
         self.last_time = None
         self.integral_e_d = 0.0
         self.integral_e_theta = 0.0
         self.last_signed_e_d = 0.0
         self.last_e_theta = 0.0
 
-        # Publisher for commanded velocities (/cmd_vel)
+        # Publisher for commanded velocities 
         self.cmd_pub = self.create_publisher(
             Twist,
             '/cmd_vel',
             qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE)
         )
 
-        # Subscribers for odometry and goal setpoint
+        # Subscriber for odometry
         self.odom_sub = self.create_subscription(
             Odometry,
             '/odom',
             self.odom_callback,
             qos.qos_profile_sensor_data
         )
-        self.goal_sub = self.create_subscription(
-            PIDGoalPose, 
-            '/goal',
-            self.goal_callback,
-            qos.qos_profile_sensor_data
-        )
-        self.goal_srv = self.create_service(
-            GoalReached, '/goal_completed',
-            self.handle_goal_completed
-        )
-
+        
+        # Service client for requesting the next waypoint
+        self.next_waypoint_client = self.create_client(NextWaypoint, '/next_waypoint')
+        while not self.next_waypoint_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for the next_waypoint service...')
+        
         # Timer for the control loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
         self.last_log_time = 0.0
 
         self.get_logger().info("PID Position Controller Node Started.")
+        
+        # Request the first waypoint
+        self.request_next_waypoint(True)
     
     def apply_velocity_constraints(self, velocity, min_vel, max_vel):
         """
@@ -174,20 +180,49 @@ class PIDPointController(Node):
             
         return velocity
     
-    def goal_callback(self, msg):
-        # Receive a new goal and reset PID state
-        self.setpoint.x = msg.pose.position.x
-        self.setpoint.y = msg.pose.position.y
-        self.setpoint.theta = msg.theta
-
-        self.last_time = None
-        self.integral_e_d = 0.0
-        self.integral_e_theta = 0.0
-        self.last_signed_e_d = 0.0
-        self.last_e_theta = 0.0
-        self.goal_received = True
-        self.goal_done = False
-        self.get_logger().info(f'New goal: x={self.setpoint.x:.2f}, y={self.setpoint.y:.2f}')
+    def request_next_waypoint(self, previous_reached=True):
+        # Request the next waypoint from the service provider
+        request = NextWaypoint.Request()
+        request.previous_reached = previous_reached
+        
+        # Send the request
+        future = self.next_waypoint_client.call_async(request)
+        future.add_done_callback(self.process_waypoint_response)
+    
+    def process_waypoint_response(self, future):
+        # Process the response from the waypoint service
+        try:
+            response = future.result()
+            
+            if response.completed:
+                self.get_logger().info("Path completed! No more waypoints available.")
+                self.path_completed = True
+                self.goal_active = False
+                
+                # Stop the robot
+                cmd = Twist()
+                self.cmd_pub.publish(cmd)
+                return
+            
+            # Process the new waypoint
+            self.current_waypoint_id = response.waypoint_id
+            self.setpoint.x = response.goal.pose.position.x
+            self.setpoint.y = response.goal.pose.position.y
+            self.setpoint.theta = response.goal.theta
+            
+            # Reset PID state for the new goal
+            self.last_time = None
+            self.integral_e_d = 0.0
+            self.integral_e_theta = 0.0
+            self.last_signed_e_d = 0.0
+            self.last_e_theta = 0.0
+            self.goal_active = True
+            
+            self.get_logger().info(f'New waypoint {self.current_waypoint_id+1}: ' +
+                                   f'x={self.setpoint.x:.2f}, y={self.setpoint.y:.2f}.')
+        
+        except Exception as e:
+            self.get_logger().error(f"Error processing waypoint response: {e}.")
 
     def odom_callback(self, msg):
         # Update robot pose from odometry
@@ -200,16 +235,10 @@ class PIDPointController(Node):
             msg.pose.pose.orientation.w
         )
         self.current_pose.theta = yaw
-
-    def handle_goal_completed(self, request, response):
-        response.success = bool(self.goal_done)
-        if self.goal_done:
-            self.get_logger().info("GoalReached service.")
-        return response
     
     def control_loop(self):
         # Run PID control only when a goal is active
-        if not self.goal_received:
+        if not self.goal_active or self.path_completed:
             return
         
         now_time = self.get_clock().now().nanoseconds * 1e-9
@@ -235,11 +264,19 @@ class PIDPointController(Node):
         e_theta = wrap_to_pi(math.atan2(e_y, e_x) - self.current_pose.theta)
 
         # Auto-stop if both errors are below thresholds
-        if abs_e_d < self.position_tolerance and abs(e_theta) < self.angle_tolerance:
-            self.cmd_pub.publish(Twist())  
-            self.get_logger().info('Goal reached.')
-            self.goal_received = False
-            self.goal_done = True
+        if abs_e_d < self.goal_tolerance and abs(e_theta) < self.heading_tolerance:
+            # Stop the robot temporarily
+            self.cmd_pub.publish(Twist())
+            self.get_logger().info(f'Waypoint {self.current_waypoint_id+1} reached at ' + 
+                                   f'x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.')
+            
+            # Mark the current goal as completed
+            self.goal_active = False
+            
+            # Request the next waypoint if auto-request is enabled
+            if self.auto_request_next:
+                self.request_next_waypoint(True)
+            
             return
 
         # PID control for linear velocity
@@ -267,10 +304,13 @@ class PIDPointController(Node):
         cmd.angular.z = Omega
         self.cmd_pub.publish(cmd)
 
-        # Debug info
-        self.get_logger().debug(
-            f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
-        )
+        # Debug info - limit logging frequency
+        current_time = time.time()
+        if current_time - self.last_log_time > 1.0:  
+            self.get_logger().info(
+                f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}."
+            )
+            self.last_log_time = current_time
 
 def main(args=None):
     rclpy.init(args=args)

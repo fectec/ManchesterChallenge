@@ -6,13 +6,13 @@ import json
 import math
 
 from custom_interfaces.msg import PIDGoalPose
-from custom_interfaces.srv import GoalReached
+from custom_interfaces.srv import NextWaypoint
 from geometry_msgs.msg import Point, Quaternion
 
 # ========================
 # Utility Functions
 # ========================
-def yaw_to_quaternion(yaw: float) -> Quaternion:
+def yaw_to_quaternion(yaw):
     # Convert a yaw angle (radians) into a quaternion message
     q = Quaternion()
     q.x = 0.0
@@ -26,11 +26,10 @@ def yaw_to_quaternion(yaw: float) -> Quaternion:
 # ========================
 class PIDPathGenerator(Node):
     """
-    Sequentially publishes goal poses for a PID controller.
+    Provides waypoints as a service for a PID controller.
     Waypoints are loaded from the ROS parameter 'waypoints_json' as a JSON array of
-    objects containing 'x' and 'y' coordinates. The node publishes each goal to '/goal'
-    and waits for confirmation via the '/goal_completed' service before proceeding.
-    Requires at least three waypoints; otherwise the node will exit.
+    objects containing 'x' and 'y' coordinates. The node serves each waypoint via
+    the '/next_waypoint' service when requested by the PID controller.
     """
 
     def __init__(self):
@@ -38,9 +37,7 @@ class PIDPathGenerator(Node):
         
         # Declare and parse operating parameters
         self.declare_parameter('waypoints_json', '[]')
-        self.declare_parameter('timer_interval', 0.5)
         raw = self.get_parameter('waypoints_json').value
-        self.interval = self.get_parameter('timer_interval').value
 
         try:
             self.waypoints = json.loads(raw)
@@ -56,52 +53,81 @@ class PIDPathGenerator(Node):
             rclpy.shutdown()
             return
         
-        # Publisher for PIDGoalPose messages
-        self.goal_pub = self.create_publisher(PIDGoalPose, '/goal', 10)
-
-        # Service client for goal completion confirmation
-        self.client = self.create_client(GoalReached, '/goal_completed')
-        while not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for /goal_completed service...')
-
+        # Initialize waypoint index
         self.index = 0
-        self.timer = self.create_timer(self.interval, self.publish_next_goal) 
-
-    def publish_next_goal(self):
-        if self.index >= len(self.waypoints):
-            self.get_logger().info('All waypoints processed. Exiting.')
-            self.timer.cancel()
-            return          
         
-        wp = self.waypoints[self.index]
+        # Create a service to provide the next waypoint
+        self.srv = self.create_service(
+            NextWaypoint, 
+            '/next_waypoint', 
+            self.next_waypoint_callback
+        )
+        
+        self.get_logger().info(f'PID Path Generator started with {len(self.waypoints)} waypoints.')
+
+    def shutdown_node(self):
+        # Cleanly shutdown the node once all waypoints are served
+        self.get_logger().info('PID Path Generator shutting down.')
+        rclpy.shutdown()
+
+    def next_waypoint_callback(self, request, response):
+        """
+        Service callback that provides the next waypoint when requested.
+        
+        If previous_reached is False, it will resend the current waypoint.
+        If all waypoints have been processed, it will set the 'completed' flag in the response.
+        """
+        # If PID controller didn't reach the previous point, resend the same point
+        if not request.previous_reached and self.index > 0:
+            self.get_logger().warn(f'Previous waypoint not reached. Resending waypoint {self.index}.')
+            current_index = self.index - 1  # Use the previous index
+        else:
+            current_index = self.index
+            
+        # Check if we've processed all waypoints
+        if current_index >= len(self.waypoints):
+            self.get_logger().info('All waypoints have been processed.')
+            response.completed = True
+            response.goal = PIDGoalPose()  # Empty goal
+            
+            # Schedule shutdown of the node
+            self.create_timer(1.0, self.shutdown_node)  
+
+            return response
+        
+        # Get the current waypoint
+        wp = self.waypoints[current_index]
+        
         try:
             x = float(wp['x'])
             y = float(wp['y'])
         except (KeyError, ValueError, TypeError):
             self.get_logger().error(f'Invalid waypoint format: {wp}.')
-            self.timer.cancel()
-            return
+            response.completed = True       # Mark as completed to end the sequence
+            response.goal = PIDGoalPose() 
+
+            # Schedule shutdown of the node
+            self.create_timer(1.0, self.shutdown_node)  
+
+            return response
+            
+        # Create and populate the response
+        goal = PIDGoalPose()
+        goal.pose.position = Point(x=x, y=y, z=0.0)
+        goal.theta = 0.0
+        goal.pose.orientation = yaw_to_quaternion(0.0)
         
-        # Construct and publish the goal message
-        msg = PIDGoalPose()
-        msg.pose.position = Point(x=x, y=y, z=0.0)
-        msg.theta = 0.0
-        msg.pose.orientation = yaw_to_quaternion(0.0)
-        self.goal_pub.publish(msg)
-        self.get_logger().info(f'Published goal {self.index+1}/{len(self.waypoints)}: x={x}, y={y}')
-
-        # Call the confirmation service and wait
-        req = GoalReached.Request()
-        future = self.client.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-
-        result = future.result()
-        if result and result.success:
-            self.get_logger().info('Goal reached confirmed.')
+        response.goal = goal
+        response.completed = False
+        response.waypoint_id = current_index
+        
+        self.get_logger().info(f'Providing waypoint {current_index+1}/{len(self.waypoints)}: x={x}, y={y}')
+        
+        # Increment the index if the previous was reached
+        if request.previous_reached:
             self.index += 1
-        else:
-            self.get_logger().warn('Goal confirmation failed or timed out. Stopping.')
-            self.timer.cancel()
+            
+        return response
 
 def main(args=None):
     rclpy.init(args=args)

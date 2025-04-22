@@ -17,7 +17,7 @@ def angle_diff_signed(sign, diff):
     # Return signed angle difference based on the sign
     return diff if sign>0 else -diff
 
-def yaw_to_quaternion(yaw: float) -> Quaternion:
+def yaw_to_quaternion(yaw):
     # Convert a yaw angle (radians) into a quaternion message
     q = Quaternion()
     q.x = 0.0
@@ -39,13 +39,10 @@ class OpenLoopPathGenerator(Node):
     def __init__(self):
         super().__init__('open_loop_path_generator')
 
-        # Publisher for OpenLoopPose, which contains robot's velocities and execution time
-        self.pose_pub = self.create_publisher(OpenLoopPose, 'pose', 10)
-
-        # Declare parameters (e.g., waypoints, max speed, and safety margin for scaling)
+        # Declare parameters
         self.declare_parameter('waypoints_json', '[]')
-        self.declare_parameter('max_linear_speed', 0.5)
-        self.declare_parameter('max_angular_speed', 0.5)
+        self.declare_parameter('max_linear_speed', 0.16)    # m/s
+        self.declare_parameter('max_angular_speed', 0.9)    # rad/s
         self.declare_parameter('safety_margin', 0.1)
 
         # Retrieve parameters and parse the waypoints JSON string
@@ -65,11 +62,15 @@ class OpenLoopPathGenerator(Node):
             self.destroy_node()
             return
         
+        # Publisher for OpenLoopPose, which contains robot's velocities and execution time
+        self.pose_pub = self.create_publisher(OpenLoopPose, 'pose', 10)
+        
         # Initialize robot's current position and orientation, and start waypoint index
         self.xcur = 0.0
         self.ycur = 0.0
         self.thcur = 0.0
         self.index = 0
+
         self.timer = self.create_timer(1.0, self.process_waypoint)
 
     def process_waypoint(self):
@@ -113,10 +114,10 @@ class OpenLoopPathGenerator(Node):
             raw_time_sum = time_for_rotation_at_max + time_for_translation_at_max
             scaled_time_sum = raw_time_sum * (1.0 + self.margin)
 
-            # If the required time exceeds the total available time, log an error
+            # If the required time exceeds the total available time, stop
             if scaled_time_sum > total_time:
                 self.get_logger().error("Impossible speeds for time mode (scaled sum exceeds total_time).")
-                self.stop()
+                self.timer.cancel()
                 return
 
             # Scale the time for rotation and translation to fit the total time
@@ -137,7 +138,7 @@ class OpenLoopPathGenerator(Node):
             # Check if the sum of rotation time and translation time exceeds the total time specified in the waypoint
             if (rotation_time + translation_time) > total_time:
                 self.get_logger().error("Even clamped speeds exceed total_time.")
-                self.stop()
+                self.timer.cancel()
                 return
             
             # Publish the subcommands (rotation + translation)
@@ -162,7 +163,7 @@ class OpenLoopPathGenerator(Node):
             # Check if the user-defined speeds exceed the limits
             if rs > self.max_ang or ls > self.max_lin:
                 self.get_logger().error("User-defined speeds exceed puzzlebot limits.")
-                self.stop()
+                self.timer.cancel()
                 return
             
             # Calculate the rotation and translation times based on the speed values
@@ -184,7 +185,7 @@ class OpenLoopPathGenerator(Node):
             )
         else:
             self.get_logger().error("Waypoint must define either total_time OR rot_speed+lin_speed.")
-            self.stop()
+            self.timer.cancel()
             return
 
         self.index += 1     # Move to the next waypoint
@@ -196,7 +197,6 @@ class OpenLoopPathGenerator(Node):
         Publish the subcommands (rotation and translation) to the 'pose' topic as OpenLoopPose messages.
         The robot will rotate and move to the target waypoint.
         """
-        # Only publish a rotation command if the rotation time is greater than a small threshold 
         if angle_diff > 1e-6 and rot_time > 1e-6:
             msg_rot = OpenLoopPose()
             msg_rot.pose.position.x = self.xcur
@@ -207,7 +207,6 @@ class OpenLoopPathGenerator(Node):
             msg_rot.execution_time = rot_time
             self.pose_pub.publish(msg_rot)
 
-        # Only publish a translation command if the translation distance is greater than a small threshold
         if dist > 1e-6 and lin_time > 1e-6:
             msg_trans = OpenLoopPose()
             msg_trans.pose.position.x = self.xcur
@@ -227,9 +226,6 @@ class OpenLoopPathGenerator(Node):
         # The modulo operation ensures that the angle stays within the range of [-pi, pi], maintaining proper angular continuity
         raw_diff = angle_diff if (sign > 0) else -angle_diff
         self.thcur = (self.thcur + raw_diff + math.pi) % (2 * math.pi) - math.pi
-
-    def stop(self):
-        self.timer.cancel()
 
 def main(args=None):
     rclpy.init(args=args)

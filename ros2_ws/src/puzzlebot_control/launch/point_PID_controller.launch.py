@@ -14,8 +14,8 @@ def generate_launch_description():
         parameters=[{
             'wheel_base': 0.18,
             'wheel_radius': 0.05,
-            'update_rate': 50.0,
-            'integration_period': 0.02
+            'update_rate': 100.0,
+            'integration_period': 0.01
         }]
     )
         
@@ -25,18 +25,18 @@ def generate_launch_description():
         name='point_PID_controller',
         parameters=[{
             'Kp_V': 0.2,
-            'Ki_V': 0.0,
+            'Ki_V': 0.01,
             'Kd_V': 0.0,
             'Kp_Omega': 0.2,
-            'Ki_Omega': 0.0,
+            'Ki_Omega': 0.01,
             'Kd_Omega': 0.0,
-            'position_tolerance': 0.05,
-            'angle_tolerance': 0.05,
-            'min_linear_vel': 0.05, 
+            'goal_tolerance': 0.15,
+            'heading_tolerance': 0.15,
+            'min_linear_vel': 0.09, 
             'max_linear_vel': 0.16,
             'min_angular_vel': 0.1,
-            'max_angular_vel': 0.9,
-            'update_rate': 25.0
+            'max_angular_vel': 1.0,
+            'update_rate': 50.0
         }]
     )
 

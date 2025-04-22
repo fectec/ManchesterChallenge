@@ -4,6 +4,7 @@ import rclpy
 import transforms3d
 import numpy as np
 import math
+import time
 
 from rclpy.node import Node
 from rclpy import qos
@@ -93,11 +94,11 @@ class OdometryLocalization(Node):
         self.get_logger().info("Differential-Drive Dead-Reckoning Node Started.")
 
     def right_wheel_callback(self, msg):
-        """Update right wheel angular velocity (rad/s) from the encoder."""
+        # Update right wheel angular velocity (rad/s) from the encoder#
         self.omega_r = msg.data
 
     def left_wheel_callback(self, msg):
-        """Update left wheel angular velocity (rad/s) from the encoder."""
+        # Update left wheel angular velocity (rad/s) from the encoder
         self.omega_l = msg.data
 
     def update_odometry(self):
@@ -169,10 +170,13 @@ class OdometryLocalization(Node):
         t.transform.rotation.w = quat[0]
         self.tf_broadcaster.sendTransform(t)   
 
-        # Log the updated pose
-        self.get_logger().info(
-            f"Pose -> x: {self.x:.3f}, y: {self.y:.3f}, theta: {self.theta:.3f} rad"
-        )
+        # Log the updated pose - limit logging frequency
+        current_time = time.time()
+        if current_time - self.last_log_time > 1.0:  # Log once per second at most
+            self.get_logger().info(
+                f"Pose -> x: {self.x:.3f}, y: {self.y:.3f}, theta: {self.theta:.3f} rad"
+            )
+            self.last_log_time = current_time
         
 def main(args=None):
     rclpy.init(args=args)

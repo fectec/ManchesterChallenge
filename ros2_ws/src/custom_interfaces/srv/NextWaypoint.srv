@@ -1,0 +1,9 @@
+# NextWaypoint.srv
+
+# Request: Inform the path generator if the previous waypoint was reached
+bool previous_reached
+---
+# Response: The next waypoint to follow
+custom_interfaces/PIDGoalPose goal
+bool completed      # True when no more waypoints are available
+int32 waypoint_id   # ID of the current waypoint
