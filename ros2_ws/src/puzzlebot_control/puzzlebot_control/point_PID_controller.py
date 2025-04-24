@@ -161,22 +161,16 @@ class PIDPointController(Node):
         self.request_next_waypoint(True)
     
     def apply_velocity_constraints(self, velocity, min_vel, max_vel):
-        """
-        Apply minimum and maximum velocity constraints to handle nonlinearity.
-        
-        If the absolute value of velocity is below min_vel but not zero, set it to min_vel
-        while preserving the sign. Limit the velocity to max_vel.
-        """
-        if abs(velocity) < 0.001:  # Effectively zero
+        if abs(velocity) < 0.01:  # Effectively zero
             return 0.0
             
         # Apply minimum threshold (to overcome friction/inertia)
-        if abs(velocity) < min_vel:
-            velocity = min_vel * (1 if velocity > 0 else -1)
+        if abs(velocity) < abs(min_vel):
+            velocity = abs(min_vel) * (1 if velocity > 0 else -1)
             
         # Apply maximum limit (saturation)
-        if abs(velocity) > max_vel:
-            velocity = max_vel * (1 if velocity > 0 else -1)
+        if abs(velocity) > abs(max_vel):
+            velocity = abs(max_vel) * (1 if velocity > 0 else -1)
             
         return velocity
     
@@ -267,9 +261,13 @@ class PIDPointController(Node):
         if abs_e_d < self.goal_tolerance and abs(e_theta) < self.heading_tolerance:
             # Stop the robot temporarily
             self.cmd_pub.publish(Twist())
-            self.get_logger().info(f'Waypoint {self.current_waypoint_id+1} reached at ' + 
-                                   f'x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.')
-            
+
+            # Log waypoint reached information
+            self.get_logger().info('---------------------------------------------------\n'
+                                f'Waypoint {self.current_waypoint_id+1} reached at ' + 
+                                f'x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.\n'
+                                '---------------------------------------------------')
+
             # Mark the current goal as completed
             self.goal_active = False
             
@@ -306,7 +304,7 @@ class PIDPointController(Node):
 
         # Debug info - limit logging frequency
         current_time = time.time()
-        if current_time - self.last_log_time > 1.0:  
+        if current_time - self.last_log_time > 1.0:  # Log once per second at most
             self.get_logger().info(
                 f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}."
             )

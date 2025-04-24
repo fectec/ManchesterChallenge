@@ -28,7 +28,7 @@ def generate_launch_description():
                                                 ]), 
                                                 value_type=str)
 
-    robot_state_publisher = Node(
+    robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         parameters=[{'robot_description': robot_description}]
@@ -58,7 +58,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         model_arg,
-        robot_state_publisher,
+        robot_state_publisher_node,
         gazebo_resource_path,
         gazebo,
         gz_spawn_entity
