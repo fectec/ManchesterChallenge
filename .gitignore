@@ -47,11 +47,6 @@ catkin_build/
 
 .vscode/
 
-# Ignore Docker files if you're using dockerized environment
-
-# docker-compose.yml
-# Dockerfile
-
 # Ignore temporary files
 
 *.tmp
