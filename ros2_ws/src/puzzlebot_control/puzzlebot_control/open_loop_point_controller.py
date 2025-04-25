@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import rclpy
+
 from rclpy.node import Node
+
 from geometry_msgs.msg import Twist
 from custom_interfaces.msg import OpenLoopPose
 
@@ -9,7 +11,7 @@ from custom_interfaces.msg import OpenLoopPose
 IDLE = 0  
 EXECUTING = 1  
 
-class OpenLoopController(Node):
+class OpenLoopPointController(Node):
     """
     A ROS2 node that acts as an open-loop controller for a robot. It subscribes to pose commands 
     (OpenLoopPose messages), which contain the robot's desired linear and angular velocities 
@@ -21,21 +23,19 @@ class OpenLoopController(Node):
     - EXECUTING: The node is actively executing a command from the queue, updating the robot's 
       velocity as per the command's linear and angular velocities.
     """
+    
     def __init__(self):
-        super().__init__('open_loop_controller')
+        super().__init__('open_loop_point_controller')
 
         # Declare and retrieve parameters 
-        self.declare_parameter('timer_period', 0.1)     # The period (s) at which the FSM is executed
-        self.timer_period = self.get_parameter('timer_period').value  
+        self.declare_parameter('update_rate', 50.0)     # The frequency (Hz) at which the FSM is executed
+        update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
 
         # Publisher for the Twist message, sending commands to 'cmd_vel' topic
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
         # Subscriber to receive OpenLoopPose messages
-        self.pose_sub = self.create_subscription(OpenLoopPose, 'pose', self.pose_callback, 10)
-
-        # Create a timer that triggers the finite state machine loop every certain period
-        self.timer = self.create_timer(self.timer_period, self.fsm_loop)
+        self.open_loop_pose_sub = self.create_subscription(OpenLoopPose, '/puzzlebot_real/open_loop_pose', self.open_loop_pose_callback, 10)
 
         # Initialize FSM state to IDLE
         self.state = IDLE
@@ -47,21 +47,21 @@ class OpenLoopController(Node):
         self.current_cmd = None
         self.cmd_start_time = None
 
-        self.get_logger().info("OpenLoopController node initialized and ready to process commands.")  
+        # Create a timer that triggers the finite state machine loop every certain period
+        self.timer = self.create_timer(1.0 / update_rate, self.fsm_loop)
 
-    def pose_callback(self, msg):
+        self.get_logger().info("OpenLoopPointController Start.")  
+
+    def open_loop_pose_callback(self, msg):
         # Add the received pose message to the queue for execution
         self.cmd_queue.append(msg)
         
         self.get_logger().info(
-            f"Queued command: lin={msg.linear_velocity:.2f}, ang={msg.angular_velocity:.2f}, time={msg.execution_time:.2f}"
+            f"Queued command: LIN={msg.linear_velocity:.2f} ANG={msg.angular_velocity:.2f} TIME={msg.execution_time:.2f}"
         )
 
     def fsm_loop(self):
-        """
-        Finite state machine loop that processes commands.
-        """
-        # Create an empty Twist message to send to cmd_vel
+        # Create an empty Twist message to send to 'cmd_vel'
         twist = Twist()
         
         # Check the current state of the FSM
@@ -90,7 +90,7 @@ class OpenLoopController(Node):
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
                 self.cmd_vel_pub.publish(twist)
-                self.get_logger().info("Completed command")
+                self.get_logger().info("Completed command.")
                 
                 # Reset variables and return to IDLE state
                 self.current_cmd = None
@@ -99,15 +99,16 @@ class OpenLoopController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OpenLoopController()
+    node = OpenLoopPointController()
     
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Interrupted with Ctrl+C.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

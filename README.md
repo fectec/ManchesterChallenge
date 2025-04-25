@@ -453,7 +453,7 @@ As mentioned before, on the hackerboard configuration page, under <strong>Motor-
 A basic open-loop controller was implemented to command the Puzzlebot to move between predefined waypoints. The controller publishes linear and angular velocities directly for specific durations.
 
 <p align="justify">
-You can configure a path in <code>puzzlebot_control/config/point_open_loop_path.yaml</code>. Each waypoint should define its <code>x</code> and <code>y</code> coordinates and either a target duration or a pair of speed commands. Two modes are available:
+You can configure a path in <code>puzzlebot_control/config/open_loop_point_controller_config.yaml</code>. Each waypoint should define its <code>x</code> and <code>y</code> coordinates and either a target duration or a pair of speed commands. Two modes are available:
 </p>
 
 <ul>
@@ -471,18 +471,24 @@ In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>m
 
 <p><strong>Example – Time-based Mode</strong></p>
 
-<pre><code>point_open_loop_path_generator:
+<pre><code>
+open_loop_path_generator:
   ros__parameters:
+    update_rate: 1.0
     waypoints_json: |
       [
-        { "x": 0.0, "y": 0.5, "total_time": 10.0 },
-        { "x": -0.5, "y": 0.0, "total_time": 10.0 },
-        { "x": -1.0, "y": 0.5, "total_time": 10.0 },
-        { "x": -1.0, "y": 0.0, "total_time": 10.0 }
+        { "x": 0.0,  "y": 0.25, "total_time": 6.0 },
+        { "x": -0.25,"y": 0.0,  "total_time": 6.0 },
+        { "x": -0.5, "y": 0.25, "total_time": 6.0 },
+        { "x": -0.5, "y": 0.0,  "total_time": 6.0 }
       ]
-    max_linear_speed: 0.16
-    max_angular_speed: 0.9
-    safety_margin: 0.1
+    max_linear_speed: 0.17
+    max_angular_speed: 1.0
+    safety_margin: 0.2
+
+open_loop_point_controller:
+  ros__parameters:
+    update_rate: 50.0
 </code></pre>
 
 <p align="center">
@@ -491,16 +497,22 @@ In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>m
 
 <p><strong>Example – Speed-based Mode</strong></p>
 
-<pre><code>point_open_loop_path_generator:
+<pre><code>
+open_loop_path_generator:
   ros__parameters:
+    update_rate: 1.0
     waypoints_json: |
       [
-        { "x": 0.1, "y": 0.0, "lin_speed": 0.12, "rot_speed": 0.6 },
-        { "x": 0.1, "y": 0.1, "lin_speed": 0.12, "rot_speed": 0.6 },
-        { "x": 0.0, "y": 0.1, "lin_speed": 0.12, "rot_speed": 0.6 },
-        { "x": 0.0, "y": 0.0, "lin_speed": 0.12, "rot_speed": 0.6 }
+        { "x": 0.25, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.25, "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.0,  "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.0,  "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 }
       ]
-    max_linear_speed: 0.16
-    max_angular_speed: 0.9
-    safety_margin: 0.1
+    max_linear_speed: 0.17
+    max_angular_speed: 1.0
+    safety_margin: 0.2
+
+open_loop_point_controller:
+  ros__parameters:
+    update_rate: 50.0
 </code></pre>

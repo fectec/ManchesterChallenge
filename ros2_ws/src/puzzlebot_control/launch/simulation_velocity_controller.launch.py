@@ -6,12 +6,12 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     wheel_radius_arg = DeclareLaunchArgument(
         'wheel_radius',
-        default_value='0.05'
+        default_value='0.0505'
     )
 
     wheel_separation_arg = DeclareLaunchArgument(
         'wheel_separation',
-        default_value='0.18'
+        default_value='0.173'
     )
 
     wheel_radius = LaunchConfiguration('wheel_radius')

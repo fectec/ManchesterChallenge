@@ -1,0 +1,33 @@
+# Time-based "M"
+open_loop_path_generator:
+  ros__parameters:
+    update_rate: 1.0
+    waypoints_json: |
+      [
+        { "x": 0.0,  "y": 0.25, "total_time": 6.0 },
+        { "x": -0.25,"y": 0.0,  "total_time": 6.0 },
+        { "x": -0.5, "y": 0.25, "total_time": 6.0 },
+        { "x": -0.5, "y": 0.0,  "total_time": 6.0 }
+      ]
+    max_linear_speed: 0.17
+    max_angular_speed: 1.0
+    safety_margin: 0.2
+
+# Speed-based square
+# open_loop_path_generator:
+#   ros__parameters:
+#     update_rate: 1.0
+#     waypoints_json: |
+#       [
+#         { "x": 0.25, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },
+#         { "x": 0.25, "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
+#         { "x": 0.0,  "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
+#         { "x": 0.0,  "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 }
+#       ]
+#     max_linear_speed: 0.17
+#     max_angular_speed: 1.0
+#     safety_margin: 0.2
+
+open_loop_point_controller:
+  ros__parameters:
+    update_rate: 50.0

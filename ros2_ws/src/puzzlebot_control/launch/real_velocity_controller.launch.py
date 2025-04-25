@@ -7,8 +7,8 @@ def generate_launch_description():
         executable='real_velocity_controller.py', 
         name='real_velocity_controller',
         parameters=[{
-            'wheel_radius': 0.05,
-            'wheel_separation': 0.18,
+            'wheel_radius': 0.0505,
+            'wheel_separation': 0.173,
             'max_speed': 5.0
         }]
     )

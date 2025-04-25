@@ -1,55 +1,41 @@
 #!/usr/bin/env python3
 
 import rclpy
-import transforms3d
-import numpy as np
 import math
 import time
 
 from rclpy.node import Node
 from rclpy import qos
-from std_msgs.msg import Float32  
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion, TransformStamped
+
 from tf2_ros import TransformBroadcaster
+from puzzlebot_utils.utils.math_helpers import wrap_to_pi, yaw_to_quaternion
 
-# ========================
-# Utility Functions
-# ========================
-def wrap_to_pi(theta):
-    # Wrap angle to [-pi, pi]
-    result = np.fmod(theta + math.pi, 2.0 * math.pi)
-    if result < 0:
-        result += 2.0 * math.pi
-    return result - math.pi
+from std_msgs.msg import Float32 
+from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
 
-# ========================
-# Odometry Localization Node
-# ========================
 class OdometryLocalization(Node):
     """
     Estimates the robot's pose (x, y, theta) by dead reckoning, using the angular
     velocities of the left and right wheels of a differential-drive robot. The 
     robot's position and orientation are updated over time using Euler integration
     of the kinematic model.
-
-    The orientation is maintained in the range [-pi, pi].
     """
 
     def __init__(self):
         super().__init__('odometry_localization')
 
-        # Declare parameters for wheel geometry (m), update rate (Hz), and integration period (s)
-        self.declare_parameter('wheel_base', 0.18)
-        self.declare_parameter('wheel_radius', 0.05)
+        # Declare parameter
         self.declare_parameter('update_rate', 200.0)
-        self.declare_parameter('integration_period', 0.01)
+        self.declare_parameter('integration_rate', 100.0)
+        self.declare_parameter('wheel_base', 0.173)
+        self.declare_parameter('wheel_radius', 0.0505)
 
         # Load parameter values
+        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value 
+        self.integration_rate = self.get_parameter('integration_rate').get_parameter_value().double_value 
         self.wheel_base = self.get_parameter('wheel_base').get_parameter_value().double_value
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
-        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value 
-        self.integration_period = self.get_parameter('integration_period').get_parameter_value().double_value 
 
         # Robot pose (x, y) and heading (theta in [-pi, pi])
         self.x = 0.0
@@ -62,6 +48,9 @@ class OdometryLocalization(Node):
 
         # Last timestamp for integration
         self.last_time = None
+        
+        # Limit logging frequency
+        self.last_log_time = 0.0
 
         # TF broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -83,15 +72,14 @@ class OdometryLocalization(Node):
         # Odometry publisher
         self.odom_pub = self.create_publisher(
             Odometry,
-            '/odom',
+            '/puzzlebot_real/odom',
             qos.qos_profile_sensor_data
         )   
 
         # Timer for periodic updates
         self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
-        self.last_log_time = 0.0
-
-        self.get_logger().info("Differential-Drive Dead-Reckoning Node Started.")
+        
+        self.get_logger().info("OdometryLocalization Start.")
 
     def right_wheel_callback(self, msg):
         # Update right wheel angular velocity (rad/s) from the encoder#
@@ -116,13 +104,14 @@ class OdometryLocalization(Node):
             self.last_time = now_time
             return
 
-        # Compute elapsed time since last update (s); skip integration if dt is less than integration_period
+        # Compute elapsed time since last update (s)
+        # Skip integration if dt is less than integration period
         dt = now_time - self.last_time
-        if dt < self.integration_period:
+        if dt < 1.0 / self.integration_rate:
             return
         self.last_time = now_time
 
-        # Convert wheel angular velocities (rad/s) to linear speeds (m/s)
+        # Convert wheel angular velocities (rad/s) to linear velocities (m/s)
         v_r = self.wheel_radius * self.omega_r
         v_l = self.wheel_radius * self.omega_l
 
@@ -145,15 +134,11 @@ class OdometryLocalization(Node):
         odom_msg.pose.pose.position.y = self.y
         odom_msg.pose.pose.position.z = 0.0
 
-        # Convert yaw to quaternion
-        quat = transforms3d.euler.euler2quat(0.0, 0.0, self.theta)
-        odom_msg.pose.pose.orientation = Quaternion(x=quat[1], y=quat[2], z=quat[3], w=quat[0])
+        odom_msg.pose.pose.orientation = yaw_to_quaternion(self.theta)
 
-        # Fill in twist
         odom_msg.twist.twist.linear.x = V
         odom_msg.twist.twist.angular.z = Omega
 
-        # Publish Odometry
         self.odom_pub.publish(odom_msg)
 
         # Broadcast TF transform
@@ -161,16 +146,16 @@ class OdometryLocalization(Node):
         t.header.stamp = now.to_msg()
         t.header.frame_id = 'odom'
         t.child_frame_id = 'base_footprint'
+
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
         t.transform.translation.z = 0.0
-        t.transform.rotation.x = quat[1]
-        t.transform.rotation.y = quat[2]
-        t.transform.rotation.z = quat[3]
-        t.transform.rotation.w = quat[0]
+
+        t.transform.rotation = yaw_to_quaternion(self.theta)
+
         self.tf_broadcaster.sendTransform(t)   
 
-        # Log the updated pose - limit logging frequency
+        # Log the updated pose
         current_time = time.time()
         if current_time - self.last_log_time > 1.0:  # Log once per second at most
             self.get_logger().info(
@@ -185,10 +170,11 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass    
+        node.get_logger().info("Interrupted with Ctrl+C.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

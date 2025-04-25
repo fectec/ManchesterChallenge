@@ -164,13 +164,15 @@ class VelocityController(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = VelocityController()
+    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Interrupted with Ctrl+C.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

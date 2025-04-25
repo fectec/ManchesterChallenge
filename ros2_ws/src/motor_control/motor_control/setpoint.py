@@ -108,12 +108,13 @@ def main(args=None):
     setpoint = SetpointPublisherNode()
     
     try:
-        rclpy.spin(setpoint)
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Interrupted with Ctrl+C.")
     finally:
-        setpoint.destroy_node()
-        rclpy.shutdown()
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

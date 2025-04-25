@@ -25,11 +25,11 @@ install(
 install(PROGRAMS
   ${PROJECT_NAME}/simulation_velocity_controller.py
   ${PROJECT_NAME}/real_velocity_controller.py
-  ${PROJECT_NAME}/point_open_loop_controller.py
-  ${PROJECT_NAME}/point_open_loop_path_generator.py
+  ${PROJECT_NAME}/open_loop_path_generator.py
+  ${PROJECT_NAME}/open_loop_point_controller.py
   ${PROJECT_NAME}/odometry_localization.py
-  ${PROJECT_NAME}/point_PID_controller.py
-  ${PROJECT_NAME}/point_PID_path_generator.py
+  ${PROJECT_NAME}/pid_path_generator.py
+  ${PROJECT_NAME}/pid_point_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
