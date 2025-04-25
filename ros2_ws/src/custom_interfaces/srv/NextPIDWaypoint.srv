@@ -1,4 +1,4 @@
-# NextWaypoint.srv
+# NextPIDWaypoint.srv
 
 # Request: Inform the path generator if the previous waypoint was reached
 bool previous_reached

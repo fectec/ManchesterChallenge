@@ -13,7 +13,7 @@ find_package(geometry_msgs             REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetProcessBool.srv"
-  "srv/NextWaypoint.srv"
+  "srv/NextPIDWaypoint.srv"
   "msg/OpenLoopPose.msg"
   "msg/PIDGoalPose.msg"
   DEPENDENCIES std_msgs geometry_msgs
