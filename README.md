@@ -471,8 +471,7 @@ In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>m
 
 <p><strong>Example – Time-based Mode</strong></p>
 
-<pre><code>
-open_loop_path_generator:
+<pre><code>open_loop_path_generator:
   ros__parameters:
     update_rate: 1.0
     waypoints_json: |
@@ -497,8 +496,7 @@ open_loop_point_controller:
 
 <p><strong>Example – Speed-based Mode</strong></p>
 
-<pre><code>
-open_loop_path_generator:
+<pre><code>open_loop_path_generator:
   ros__parameters:
     update_rate: 1.0
     waypoints_json: |
