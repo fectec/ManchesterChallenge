@@ -3,6 +3,7 @@
 import rclpy
 import json
 import math
+import sys
 
 from rclpy.node import Node
 
@@ -25,31 +26,104 @@ class OpenLoopPathGenerator(Node):
     def __init__(self):
         super().__init__('open_loop_path_generator')
 
-        # Declare parameters
-        self.declare_parameter('update_rate', 1.0)
-        self.declare_parameter('waypoints_json', '[]')
-        self.declare_parameter('max_linear_speed', 0.17)    # m/s
-        self.declare_parameter('max_angular_speed', 1.0)    # rad/s
-        self.declare_parameter('safety_margin', 0.2)
+        # Declare parameters 
+        self.declare_parameter('update_rate',        1.0)
+        self.declare_parameter('waypoints_json',    '[]')
+        self.declare_parameter('min_linear_speed',  0.1 )
+        self.declare_parameter('max_linear_speed',  0.17)
+        self.declare_parameter('min_angular_speed', 0.1 )
+        self.declare_parameter('max_angular_speed', 1.0 )
+        self.declare_parameter('drift_margin',      0.0 )
 
-        # Retrieve parameters and parse the waypoints JSON string
-        update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
-        raw_json = self.get_parameter('waypoints_json').value
-        self.max_linear_speed = self.get_parameter('max_linear_speed').value
-        self.max_angular_speed = self.get_parameter('max_angular_speed').value
-        self.safety_margin = self.get_parameter('safety_margin').value
-        
+        # Retrieve parameters
+        update_rate        = self.get_parameter('update_rate')      .get_parameter_value().double_value
+        raw_json           = self.get_parameter('waypoints_json')   .get_parameter_value().string_value
+        min_lin            = self.get_parameter('min_linear_speed') .get_parameter_value().double_value
+        max_lin            = self.get_parameter('max_linear_speed') .get_parameter_value().double_value
+        min_ang            = self.get_parameter('min_angular_speed').get_parameter_value().double_value
+        max_ang            = self.get_parameter('max_angular_speed').get_parameter_value().double_value
+        drift_margin       = self.get_parameter('drift_margin')     .get_parameter_value().double_value
+
+        # Validate parameters
+        if update_rate <= 0.0:
+            self.get_logger().error(f"update_rate must be > 0.0 (got {update_rate})")
+            raise ValueError("Invalid update_rate")
+
+        if min_lin <= 0.0:
+            self.get_logger().error(f"min_linear_speed must be > 0.0 (got {min_lin})")
+            raise ValueError("Invalid min_linear_speed")
+        if max_lin <= min_lin:
+            self.get_logger().error(
+                f"max_linear_speed ({max_lin}) must be > min_linear_speed ({min_lin})"
+            )
+            raise ValueError("Invalid max_linear_speed")
+
+        if min_ang <= 0.0:
+            self.get_logger().error(f"min_angular_speed must be > 0.0 (got {min_ang})")
+            raise ValueError("Invalid min_angular_speed")
+        if max_ang <= min_ang:
+            self.get_logger().error(
+                f"max_angular_speed ({max_ang}) must be > min_angular_speed ({min_ang})"
+            )
+            raise ValueError("Invalid max_angular_speed")
+
+        if not (0.0 <= drift_margin < 1.0):
+            self.get_logger().error(f"drift_margin must be in [0.0,1.0) (got {drift_margin})")
+            raise ValueError("Invalid drift_margin")
+
+        # Parse & validate waypoints JSON
         try:
-            self.waypoints = json.loads(raw_json)
+            wps = json.loads(raw_json)
         except json.JSONDecodeError as e:
-            self.get_logger().error(f"Failed to parse JSON: {e}.")
-            self.waypoints = None
+            self.get_logger().error(f"Failed to parse waypoints_json: {e}")
+            raise
 
-        if not isinstance(self.waypoints, list):
-            self.get_logger().error("Invalid waypoints_json: must be a JSON array.")
-            rclpy.shutdown()
-            return
-        
+        if not isinstance(wps, list):
+            self.get_logger().error("waypoints_json must be a JSON array.")
+            raise ValueError("Invalid waypoints_json")
+
+        for idx, wp in enumerate(wps, start=1):
+            if 'total_time' in wp:
+                try:
+                    t = float(wp['total_time'])
+                except (ValueError, TypeError):
+                    self.get_logger().error(f"Waypoint {idx}: total_time must be a number (got {wp['total_time']})")
+                    raise
+                if t <= 0.0:
+                    self.get_logger().error(f"Waypoint {idx}: total_time must be > 0 (got {t:.2f})")
+                    raise ValueError("Invalid waypoint total_time")
+
+            if 'lin_speed' in wp:
+                try:
+                    ls = float(wp['lin_speed'])
+                except (ValueError, TypeError):
+                    self.get_logger().error(f"Waypoint {idx}: lin_speed must be a number (got {wp['lin_speed']})")
+                    raise
+                if ls <= 0.0 or ls < min_lin or ls > max_lin:
+                    self.get_logger().error(
+                        f"Waypoint {idx}: lin_speed ({ls:.2f}) must be >0 and in [{min_lin:.2f},{max_lin:.2f}]"
+                    )
+                    raise ValueError("Invalid waypoint lin_speed")
+
+            if 'rot_speed' in wp:
+                try:
+                    rs = float(wp['rot_speed'])
+                except (ValueError, TypeError):
+                    self.get_logger().error(f"Waypoint {idx}: rot_speed must be a number (got {wp['rot_speed']})")
+                    raise
+                if rs <= 0.0 or rs < min_ang or rs > max_ang:
+                    self.get_logger().error(
+                        f"Waypoint {idx}: rot_speed ({rs:.2f}) must be >0 and in [{min_ang:.2f},{max_ang:.2f}]"
+                    )
+                    raise ValueError("Invalid waypoint rot_speed")
+
+        self.waypoints          = wps
+        self.min_linear_speed   = min_lin
+        self.max_linear_speed   = max_lin
+        self.min_angular_speed  = min_ang
+        self.max_angular_speed  = max_ang
+        self.drift_margin       = drift_margin
+
         # Publisher for OpenLoopPose, which contains robot's velocities and execution time
         self.open_loop_pose_pub = self.create_publisher(OpenLoopPose, '/puzzlebot_real/open_loop_pose', 10)
 
@@ -97,41 +171,45 @@ class OpenLoopPathGenerator(Node):
         if 'total_time' in wp and 'rot_speed' not in wp and 'lin_speed' not in wp:
             total_time = float(wp['total_time'])    # Total time allowed for the movement
 
-            # Calculate the required time for rotation and translation at maximum speeds
-            time_for_rotation_at_max = angle_diff / self.max_angular_speed if self.max_angular_speed > 0 else 0
-            time_for_translation_at_max = distance / self.max_linear_speed if self.max_linear_speed > 0 else 0
-
-            # Total time required for both rotation and translation
+            # Compute unscaled times at max speed
+            time_for_rotation_at_max    =   angle_diff / self.max_angular_speed   
+            time_for_translation_at_max =   distance   / self.max_linear_speed    
             raw_time_sum = time_for_rotation_at_max + time_for_translation_at_max
-            scaled_time_sum = raw_time_sum * (1.0 + self.safety_margin)
 
-            # If the required time exceeds the total available time, stop
-            if scaled_time_sum > total_time:
-                self.get_logger().error("Impossible speeds for time mode (scaled sum exceeds total_time).")
+            # Check feasibility
+            if raw_time_sum > total_time:
+                self.get_logger().error(
+                    "Impossible speeds for time mode "
+                    f"(needs {raw_time_sum:.2f} s > allotted {total_time:.2f} s)."
+                )
                 rclpy.shutdown()
                 return
 
-            # Scale the time for rotation and translation to fit the total time
-            scale_factor = total_time / scaled_time_sum if scaled_time_sum > 0 else 1.0
-            effective_rotation_speed = self.max_angular_speed * scale_factor
-            effective_translation_speed = self.max_linear_speed * scale_factor
+            # Scale exactly to fill total_time
+            usable_time = total_time * (1.0 - self.drift_margin)
+            scale_factor =  raw_time_sum / usable_time if usable_time > 0.0 else 0.0
+            effective_rotation_speed    = self.max_angular_speed * scale_factor 
+            effective_translation_speed = self.max_linear_speed *  scale_factor 
+ 
+            # Dead‐zone checks
+            if effective_rotation_speed < self.min_angular_speed:
+                self.get_logger().error(
+                    f"Effective rotation speed {effective_rotation_speed:.3f} < min_angular_speed {self.min_angular_speed:.3f}."
+                )
+                rclpy.shutdown()
+                return
 
-            # Clamp the speeds if they exceed the maximum allowed speeds
-            if effective_rotation_speed > self.max_angular_speed:
-                effective_rotation_speed = self.max_angular_speed
-            if effective_translation_speed > self.max_linear_speed:
-                effective_translation_speed = self.max_linear_speed
-
-            # Calculate the new time values for rotation and translation
-            rotation_time = angle_diff / effective_rotation_speed if effective_rotation_speed > 0 else 0
-            translation_time = distance / effective_translation_speed if effective_translation_speed > 0 else 0
-        
-            # Check if the sum of rotation time and translation time exceeds the total time specified in the waypoint
-            if (rotation_time + translation_time) > total_time:
-                self.get_logger().error("Even clamped speeds exceed total_time.")
+            if effective_translation_speed < self.min_linear_speed:
+                self.get_logger().error(
+                    f"Effective translation speed {effective_translation_speed:.3f} < min_linear_speed {self.min_linear_speed:.3f}."
+                )
                 rclpy.shutdown()
                 return
             
+            # These times will now sum to total_time
+            rotation_time    = angle_diff / effective_rotation_speed    if effective_rotation_speed    > 0.0 else 0.0
+            translation_time = distance   / effective_translation_speed if effective_translation_speed > 0.0 else 0.0
+
             # Publish the subcommands (rotation + translation)
             self.publish_subcommands(
                 effective_rotation_speed, 
@@ -152,13 +230,13 @@ class OpenLoopPathGenerator(Node):
 
             # Check if the user-defined speeds exceed the limits
             if rs > self.max_angular_speed or ls > self.max_linear_speed:
-                self.get_logger().error("User-defined speeds exceed puzzlebot limits.")
+                self.get_logger().error("User-defined speeds exceed Puzzlebot limits.")
                 rclpy.shutdown()
                 return
             
             # Calculate the rotation and translation times based on the speed values
-            rotation_time = angle_diff / rs if rs>0 else 0
-            translation_time = distance / ls if ls>0 else 0
+            rotation_time = angle_diff / rs 
+            translation_time = distance / ls
 
             # Publish the subcommands (rotation + translation)
             self.publish_subcommands(
@@ -221,16 +299,20 @@ class OpenLoopPathGenerator(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OpenLoopPathGenerator()
-    
+    try:
+        node = OpenLoopPathGenerator()
+    except Exception as e:
+        print(f"[FATAL] OpenLoopPathGenerator failed to initialize: {e}.", file=sys.stderr)
+        rclpy.shutdown()
+        return
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("Interrupted with Ctrl+C.")
+        pass
     finally:
         node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.shutdown()
         
 if __name__ == '__main__':
     main()

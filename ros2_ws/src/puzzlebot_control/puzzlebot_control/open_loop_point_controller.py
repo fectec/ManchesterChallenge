@@ -28,7 +28,7 @@ class OpenLoopPointController(Node):
         super().__init__('open_loop_point_controller')
 
         # Declare and retrieve parameters 
-        self.declare_parameter('update_rate', 50.0)     # The frequency (Hz) at which the FSM is executed
+        self.declare_parameter('update_rate', 100.0)     # The frequency (Hz) at which the FSM is executed
         update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
 
         # Publisher for the Twist message, sending commands to 'cmd_vel' topic

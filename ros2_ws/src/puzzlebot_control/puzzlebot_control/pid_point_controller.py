@@ -67,7 +67,7 @@ class PIDPointController(Node):
         self.declare_parameter('heading_tolerance', 0.08)
 
         # Declare velocity constraints (m/s & rad/s) for nonlinearity handling
-        self.declare_parameter('min_linear_speed', 0.11)    # Minimum linear velocity to overcome friction
+        self.declare_parameter('min_linear_speed', 0.1)     # Minimum linear velocity to overcome friction
         self.declare_parameter('max_linear_speed', 0.17)    # Maximum safe linear velocity
         self.declare_parameter('min_angular_speed', -1.0)   # Minimum angular velocity to overcome inertia
         self.declare_parameter('max_angular_speed', 1.0)    # Maximum safe angular velocity

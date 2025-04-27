@@ -3,7 +3,7 @@
 <package format="3">
   <name>puzzlebot_description</name>
   <version>0.1.0</version>
-  <description>This package provides a complete robot description for the puzzlebot.</description>
+  <description>This package provides a complete robot description for the Puzzlebot.</description>
   <maintainer email="fectec151@gmail.com">fectec</maintainer>
   <license>Apache-2.0</license>
 

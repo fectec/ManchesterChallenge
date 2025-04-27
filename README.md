@@ -466,7 +466,7 @@ You can configure a path in <code>puzzlebot_control/config/open_loop_point_contr
 </ul>
 
 <p align="justify">
-In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>max_angular_speed</code>, and a <code>safety_margin</code>. The safety margin adds an extra quantity to each command to improve robustness against drift.
+In both modes, it is necessary to specify <code>min_linear_speed</code>, <code>max_linear_speed</code>, <code>min_angular_speed</code>, <code>max_angular_speed</code>, and a <code>drift_margin</code>. The drift margin substracts an extra quantity to each command to improve robustness against drift.
 </p>
 
 <p><strong>Example – Time-based Mode</strong></p>
@@ -476,18 +476,20 @@ In both modes, it is necessary to specify <code>max_linear_speed</code>, <code>m
     update_rate: 1.0
     waypoints_json: |
       [
-        { "x": 0.0,  "y": 0.25, "total_time": 6.0 },
-        { "x": -0.25,"y": 0.0,  "total_time": 6.0 },
-        { "x": -0.5, "y": 0.25, "total_time": 6.0 },
-        { "x": -0.5, "y": 0.0,  "total_time": 6.0 }
+        { "x": 0.0,  "y": 0.25, "total_time": 5.0 },
+        { "x": -0.25,"y": 0.0,  "total_time": 5.0 },
+        { "x": -0.5, "y": 0.25, "total_time": 5.0 },
+        { "x": -0.5, "y": 0.0,  "total_time": 5.0 }
       ]
+    min_linear_speed: 0.1
     max_linear_speed: 0.17
+    min_angular_speed: 0.1
     max_angular_speed: 1.0
-    safety_margin: 0.2
+    drift_margin: 0.0
 
 open_loop_point_controller:
   ros__parameters:
-    update_rate: 50.0
+    update_rate: 100.0
 </code></pre>
 
 <p align="center">
@@ -506,11 +508,13 @@ open_loop_point_controller:
         { "x": 0.0,  "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
         { "x": 0.0,  "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 }
       ]
+    min_linear_speed: 0.1
     max_linear_speed: 0.17
+    min_angular_speed: 0.1
     max_angular_speed: 1.0
-    safety_margin: 0.2
+    drift_margin: 0.0
 
 open_loop_point_controller:
   ros__parameters:
-    update_rate: 50.0
+    update_rate: 100.0
 </code></pre>
