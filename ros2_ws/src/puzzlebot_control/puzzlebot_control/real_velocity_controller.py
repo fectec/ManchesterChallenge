@@ -24,8 +24,8 @@ class VelocityController(Node):
         self.max_speed = self.get_parameter("max_speed").get_parameter_value().double_value
 
         # Publishers for left and right wheel velocities
-        self.pub_wheel_left = self.create_publisher(Float32, '/VelocitySetL', 10)
-        self.pub_wheel_right = self.create_publisher(Float32, '/VelocitySetR', 10)
+        self.pub_wheel_left = self.create_publisher(Float32, 'VelocitySetL', 10)
+        self.pub_wheel_right = self.create_publisher(Float32, 'VelocitySetR', 10)
        
         # Subscriber to receive Twist messages with linear and angular velocities
         self.create_subscription(TwistStamped, "puzzlebot_control/cmd_vel", self.velocity_callback, 10)

@@ -46,77 +46,78 @@ class OpenLoopPathGenerator(Node):
 
         # Validate parameters
         if update_rate <= 0.0:
-            self.get_logger().error(f"update_rate must be > 0.0 (got {update_rate})")
-            raise ValueError("Invalid update_rate")
+            self.get_logger().error(f"update_rate must be > 0.0 (got {update_rate}).")
+            raise ValueError("Invalid update_rate.")
 
         if min_lin <= 0.0:
-            self.get_logger().error(f"min_linear_speed must be > 0.0 (got {min_lin})")
-            raise ValueError("Invalid min_linear_speed")
+            self.get_logger().error(f"min_linear_speed must be > 0.0 (got {min_lin}).")
+            raise ValueError("Invalid min_linear_speed.")
         if max_lin <= min_lin:
             self.get_logger().error(
-                f"max_linear_speed ({max_lin}) must be > min_linear_speed ({min_lin})"
+                f"max_linear_speed ({max_lin}) must be > min_linear_speed ({min_lin})."
             )
-            raise ValueError("Invalid max_linear_speed")
+            raise ValueError("Invalid max_linear_speed.")
 
         if min_ang <= 0.0:
-            self.get_logger().error(f"min_angular_speed must be > 0.0 (got {min_ang})")
-            raise ValueError("Invalid min_angular_speed")
+            self.get_logger().error(f"min_angular_speed must be > 0.0 (got {min_ang}).")
+            raise ValueError("Invalid min_angular_speed.")
         if max_ang <= min_ang:
             self.get_logger().error(
-                f"max_angular_speed ({max_ang}) must be > min_angular_speed ({min_ang})"
+                f"max_angular_speed ({max_ang}) must be > min_angular_speed ({min_ang})."
             )
-            raise ValueError("Invalid max_angular_speed")
+            raise ValueError("Invalid max_angular_speed.")
 
         if not (0.0 <= drift_margin < 1.0):
-            self.get_logger().error(f"drift_margin must be in [0.0,1.0) (got {drift_margin})")
-            raise ValueError("Invalid drift_margin")
+            self.get_logger().error(f"drift_margin must be in [0.0,1.0) (got {drift_margin}).")
+            raise ValueError("Invalid drift_margin.")
 
         # Parse & validate waypoints JSON
         try:
             wps = json.loads(raw_json)
         except json.JSONDecodeError as e:
-            self.get_logger().error(f"Failed to parse waypoints_json: {e}")
+            self.get_logger().error(f"Failed to parse waypoints_json: {e}.")
             raise
 
         if not isinstance(wps, list):
             self.get_logger().error("waypoints_json must be a JSON array.")
-            raise ValueError("Invalid waypoints_json")
+            raise ValueError("Invalid waypoints_json.")
 
         for idx, wp in enumerate(wps, start=1):
             if 'total_time' in wp:
                 try:
                     t = float(wp['total_time'])
                 except (ValueError, TypeError):
-                    self.get_logger().error(f"Waypoint {idx}: total_time must be a number (got {wp['total_time']})")
+                    self.get_logger().error(f"Waypoint {idx}: total_time must be a number (got {wp['total_time']}).")
                     raise
                 if t <= 0.0:
-                    self.get_logger().error(f"Waypoint {idx}: total_time must be > 0 (got {t:.2f})")
-                    raise ValueError("Invalid waypoint total_time")
+                    self.get_logger().error(f"Waypoint {idx}: total_time must be > 0 (got {t:.2f}).")
+                    raise ValueError("Invalid waypoint total_time.")
 
             if 'lin_speed' in wp:
                 try:
                     ls = float(wp['lin_speed'])
                 except (ValueError, TypeError):
-                    self.get_logger().error(f"Waypoint {idx}: lin_speed must be a number (got {wp['lin_speed']})")
+                    self.get_logger().error(f"Waypoint {idx}: lin_speed must be a number (got {wp['lin_speed']}).")
                     raise
                 if ls <= 0.0 or ls < min_lin or ls > max_lin:
                     self.get_logger().error(
-                        f"Waypoint {idx}: lin_speed ({ls:.2f}) must be >0 and in [{min_lin:.2f},{max_lin:.2f}]"
+                        f"Waypoint {idx}: lin_speed ({ls:.2f}) must be >0 and in [{min_lin:.2f},{max_lin:.2f}]."
                     )
-                    raise ValueError("Invalid waypoint lin_speed")
+                    raise ValueError("Invalid waypoint lin_speed.")
 
             if 'rot_speed' in wp:
                 try:
                     rs = float(wp['rot_speed'])
                 except (ValueError, TypeError):
-                    self.get_logger().error(f"Waypoint {idx}: rot_speed must be a number (got {wp['rot_speed']})")
+                    self.get_logger().error(f"Waypoint {idx}: rot_speed must be a number (got {wp['rot_speed']}).")
                     raise
                 if rs <= 0.0 or rs < min_ang or rs > max_ang:
                     self.get_logger().error(
-                        f"Waypoint {idx}: rot_speed ({rs:.2f}) must be >0 and in [{min_ang:.2f},{max_ang:.2f}]"
+                        f"Waypoint {idx}: rot_speed ({rs:.2f}) must be >0 and in [{min_ang:.2f},{max_ang:.2f}]."
                     )
-                    raise ValueError("Invalid waypoint rot_speed")
+                    raise ValueError("Invalid waypoint rot_speed.")
 
+        self.update_rate        = update_rate
         self.waypoints          = wps
         self.min_linear_speed   = min_lin
         self.max_linear_speed   = max_lin
@@ -125,7 +126,7 @@ class OpenLoopPathGenerator(Node):
         self.drift_margin       = drift_margin
 
         # Publisher for OpenLoopPose, which contains robot's velocities and execution time
-        self.open_loop_pose_pub = self.create_publisher(OpenLoopPose, '/puzzlebot_real/open_loop_pose', 10)
+        self.open_loop_pose_pub = self.create_publisher(OpenLoopPose, 'puzzlebot_real/open_loop_pose', 10)
 
         # Initialize robot's current position and orientation, and start waypoint index
         self.x_curr = 0.0
@@ -134,7 +135,7 @@ class OpenLoopPathGenerator(Node):
         self.waypoint_index = 0
 
         # Timer for periodic updates
-        self.timer = self.create_timer(1.0 / update_rate, self.process_waypoint)
+        self.timer = self.create_timer(1.0 / self.update_rate, self.process_waypoint)
 
         self.get_logger().info("OpenLoopPathGenerator Start.")  
 
@@ -299,6 +300,7 @@ class OpenLoopPathGenerator(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+
     try:
         node = OpenLoopPathGenerator()
     except Exception as e:
@@ -309,10 +311,11 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Interrupted with Ctrl+C.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
         
 if __name__ == '__main__':
     main()

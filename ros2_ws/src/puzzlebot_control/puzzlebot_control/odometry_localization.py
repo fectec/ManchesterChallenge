@@ -3,6 +3,7 @@
 import rclpy
 import math
 import time
+import sys
 
 from rclpy.node import Node
 from rclpy import qos
@@ -25,18 +26,35 @@ class OdometryLocalization(Node):
     def __init__(self):
         super().__init__('odometry_localization')
 
-        # Declare parameter
+        # Declare parameters
         self.declare_parameter('update_rate', 200.0)
         self.declare_parameter('integration_rate', 100.0)
         self.declare_parameter('wheel_base', 0.173)
         self.declare_parameter('wheel_radius', 0.0505)
 
-        # Load parameter values
-        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value 
-        self.integration_rate = self.get_parameter('integration_rate').get_parameter_value().double_value 
-        self.wheel_base = self.get_parameter('wheel_base').get_parameter_value().double_value
-        self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
+        # Retrieve parameters
+        self.update_rate      = self.get_parameter('update_rate').value
+        self.integration_rate = self.get_parameter('integration_rate').value
+        self.wheel_base       = self.get_parameter('wheel_base').value
+        self.wheel_radius     = self.get_parameter('wheel_radius').value
 
+        # Validate parameters
+        if self.update_rate <= 0.0:
+            self.get_logger().error(f"'update_rate' must be > 0 (got {self.update_rate}).")
+            raise ValueError("Invalid update_rate.")
+
+        if self.integration_rate <= 0.0:
+            self.get_logger().error(f"'integration_rate' must be > 0 (got {self.integration_rate}).")
+            raise ValueError("Invalid integration_rate.")
+
+        if self.wheel_base <= 0.0:
+            self.get_logger().error(f"'wheel_base' must be > 0 (got {self.wheel_base}).")
+            raise ValueError("Invalid wheel_base.")
+
+        if self.wheel_radius <= 0.0:
+            self.get_logger().error(f"'wheel_radius' must be > 0 (got {self.wheel_radius}).")
+            raise ValueError("Invalid wheel_radius.")
+        
         # Robot pose (x, y) and heading (theta in [-pi, pi])
         self.x = 0.0
         self.y = 0.0
@@ -58,13 +76,13 @@ class OdometryLocalization(Node):
         # Subscribe to wheel speeds
         self.create_subscription(
             Float32,
-            '/VelocityEncR',
+            'VelocityEncR',
             self.right_wheel_callback,
             qos.qos_profile_sensor_data
         )
         self.create_subscription(
             Float32,
-            '/VelocityEncL',
+            'VelocityEncL',
             self.left_wheel_callback,
             qos.qos_profile_sensor_data
         )
@@ -72,7 +90,7 @@ class OdometryLocalization(Node):
         # Odometry publisher
         self.odom_pub = self.create_publisher(
             Odometry,
-            '/puzzlebot_real/odom',
+            'puzzlebot_real/odom',
             qos.qos_profile_sensor_data
         )   
 
@@ -165,8 +183,14 @@ class OdometryLocalization(Node):
         
 def main(args=None):
     rclpy.init(args=args)
-    node = OdometryLocalization()
-    
+
+    try:
+        node = OdometryLocalization()
+    except Exception as e:
+        print(f"[FATAL] OdometryLocalization failed to initialize: {e}.", file=sys.stderr)
+        rclpy.shutdown()
+        return
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

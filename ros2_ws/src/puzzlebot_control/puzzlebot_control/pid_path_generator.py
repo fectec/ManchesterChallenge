@@ -3,6 +3,7 @@
 import rclpy
 import json
 import math
+import sys
 
 from rclpy.node import Node
 
@@ -29,23 +30,59 @@ class PIDPathGenerator(Node):
         self.declare_parameter('min_waypoint_distance', 0.0)
         self.declare_parameter('max_waypoint_distance', float('inf'))
 
-        raw = self.get_parameter('waypoints_json').value
+        raw           = self.get_parameter('waypoints_json').value
         self.min_dist = self.get_parameter('min_waypoint_distance').value
         self.max_dist = self.get_parameter('max_waypoint_distance').value
 
+        # Validate min/max distances
+        if self.min_dist < 0.0:
+            raise ValueError(f"'min_waypoint_distance' must be ≥ 0.0 (got {self.min_dist}).")
+
+        if self.max_dist <= self.min_dist:
+            raise ValueError(
+                f"'max_waypoint_distance' ({self.max_dist}) must be > "
+                f"'min_waypoint_distance' ({self.min_dist})."
+            )
+
+        # Parse the JSON array
         try:
             self.waypoints = json.loads(raw)
         except json.JSONDecodeError as e:
-            self.get_logger().error(f"Failed to parse waypoints_json: {e}.")
-            rclpy.shutdown()
-            return
-        
-        if not isinstance(self.waypoints, list) or len(self.waypoints) < 3:
-            self.get_logger().warning(
-                'Parameter "waypoints_json" must be a JSON array with at least 3 points.'
-            )
-            rclpy.shutdown()
-            return
+            raise ValueError(f"Failed to parse waypoints_json: {e}.")
+
+        # Validate overall structure
+        if not isinstance(self.waypoints, list):
+            raise TypeError("`waypoints_json` must be a JSON array.")
+
+        if len(self.waypoints) < 1:
+            raise ValueError("`waypoints_json` must contain at least one waypoint.")
+
+        # Validate each waypoint entry
+        for idx, wp in enumerate(self.waypoints, start=1):
+            if not isinstance(wp, dict):
+                raise TypeError(f"Waypoint #{idx} is not an object: {wp!r}.")
+            if 'x' not in wp or 'y' not in wp:
+                raise KeyError(f"Waypoint #{idx} missing 'x' or 'y': {wp!r}.")
+
+            try:
+                x = float(wp['x'])
+                y = float(wp['y'])
+            except (ValueError, TypeError):
+                raise ValueError(f"Waypoint #{idx}: 'x' and 'y' must be numbers (got {wp!r}).")
+
+            if idx == 1:
+                px, py = 0.0, 0.0
+            else:
+                prev = self.waypoints[idx-2]
+                px, py = float(prev['x']), float(prev['y'])
+
+            dist = math.hypot(x - px, y - py)
+            if dist < self.min_dist or dist > self.max_dist:
+                raise ValueError(
+                    f"Waypoint #{idx} is {dist:.3f}m from waypoint #{idx-1} "
+                    f"(allowed [{self.min_dist:.3f}, {self.max_dist:.3f}])."
+        )
+
         
         # Initialize waypoint index
         self.waypoint_index = 0
@@ -53,7 +90,7 @@ class PIDPathGenerator(Node):
         # Create a service to provide the next waypoint
         self.next_waypoint_srv = self.create_service(
             NextPIDWaypoint, 
-            '/puzzlebot_real/point_PID/next_PID_waypoint', 
+            'puzzlebot_real/point_PID/next_PID_waypoint', 
             self.next_waypoint_callback
         )
         
@@ -88,34 +125,8 @@ class PIDPathGenerator(Node):
         
         # Get the current waypoint
         wp = self.waypoints[current_index]
-        
-        try:
-            x = float(wp['x'])
-            y = float(wp['y'])
-        except (KeyError, ValueError, TypeError):
-            self.get_logger().error(f'Invalid waypoint format: {wp}.')
-            response.completed = True       
-            response.goal = PIDGoalPose() 
-            self.create_timer(1.0, self.shutdown_node)  
-            return response
-        
-        # Check distance constrains
-        if current_index > 0:
-            prev = self.waypoints[current_index-1]
-            px, py = float(prev['x']), float(prev['y'])
-            dist = math.hypot(x - px, y - py)
-        else:
-            dist = math.hypot(x, y)
-
-        if dist < self.min_dist or dist > self.max_dist:
-            self.get_logger().warn(
-                f'Waypoint {current_index+1} at distance {dist:.3f} '
-                f'outside allowed range [{self.min_dist}, {self.max_dist}]. Ending.'
-            )
-            response.completed = True
-            response.goal = PIDGoalPose()
-            self.create_timer(1.0, self.shutdown_node)
-            return response
+        x = float(wp['x'])
+        y = float(wp['y'])
             
         # Create and populate the response
         goal = PIDGoalPose()
@@ -127,7 +138,9 @@ class PIDPathGenerator(Node):
         response.completed = False
         response.waypoint_id = current_index
         
-        self.get_logger().info(f'Providing waypoint {current_index+1}/{len(self.waypoints)}: x={x}, y={y}.')
+        self.get_logger().info(
+            f'Providing waypoint {current_index+1}/{len(self.waypoints)}: x={x}, y={y}.'
+        )
         
         # Increment the index if the previous was reached
         if request.previous_reached:
@@ -137,7 +150,13 @@ class PIDPathGenerator(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PIDPathGenerator()
+
+    try:
+        node = PIDPathGenerator()
+    except Exception as e:
+        print(f"[FATAL] PIDPathGenerator failed to initialize: {e}.", file=sys.stderr)
+        rclpy.shutdown()
+        return
 
     try:
         rclpy.spin(node)

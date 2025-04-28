@@ -3,8 +3,10 @@
 import rclpy
 import math
 import time
+import sys
 
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy import qos
 
 from tf_transformations import euler_from_quaternion
@@ -50,52 +52,66 @@ class PIDPointController(Node):
     def __init__(self):
         super().__init__('pid_point_controller')
         
-        # Declare control loop update rate (Hz)
-        self.declare_parameter('update_rate', 100.0)
-        
-        # Declare PID parameters
-        self.declare_parameter('Kp_V', 0.1)
-        self.declare_parameter('Ki_V', 0.0)
-        self.declare_parameter('Kd_V', 0.0)
-
-        self.declare_parameter('Kp_Omega', 0.1)
-        self.declare_parameter('Ki_Omega', 0.0)
-        self.declare_parameter('Kd_Omega', 0.0)
-
-        # Declare stop tolerances (absolute thresholds)
-        self.declare_parameter('goal_tolerance', 0.08)
-        self.declare_parameter('heading_tolerance', 0.08)
-
-        # Declare velocity constraints (m/s & rad/s) for nonlinearity handling
-        self.declare_parameter('min_linear_speed', 0.1)     # Minimum linear velocity to overcome friction
-        self.declare_parameter('max_linear_speed', 0.17)    # Maximum safe linear velocity
-        self.declare_parameter('min_angular_speed', -1.0)   # Minimum angular velocity to overcome inertia
-        self.declare_parameter('max_angular_speed', 1.0)    # Maximum safe angular velocity
-
-        # Declare auto-request parameter
-        self.declare_parameter('auto_request_next', True)
+        # Declare parameters
+        self.declare_parameter('update_rate',         100.0)
+        self.declare_parameter('Kp_V',                0.1)
+        self.declare_parameter('Ki_V',                0.0)
+        self.declare_parameter('Kd_V',                0.0)
+        self.declare_parameter('Kp_Omega',            0.1)
+        self.declare_parameter('Ki_Omega',            0.0)
+        self.declare_parameter('Kd_Omega',            0.0)
+        self.declare_parameter('goal_tolerance',      0.08)
+        self.declare_parameter('heading_tolerance',   0.08)
+        self.declare_parameter('min_linear_speed',    0.1)
+        self.declare_parameter('max_linear_speed',    0.17)
+        self.declare_parameter('min_angular_speed',  -1.0)
+        self.declare_parameter('max_angular_speed',    1.0)
+        self.declare_parameter('auto_request_next',   True)
 
         # Load parameters
-        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
+        self.update_rate        = self.get_parameter('update_rate').value
+        self.Kp_V               = self.get_parameter('Kp_V').value
+        self.Ki_V               = self.get_parameter('Ki_V').value
+        self.Kd_V               = self.get_parameter('Kd_V').value
+        self.Kp_Omega           = self.get_parameter('Kp_Omega').value
+        self.Ki_Omega           = self.get_parameter('Ki_Omega').value
+        self.Kd_Omega           = self.get_parameter('Kd_Omega').value
+        self.goal_tolerance     = self.get_parameter('goal_tolerance').value
+        self.heading_tolerance  = self.get_parameter('heading_tolerance').value
+        self.min_linear_speed   = self.get_parameter('min_linear_speed').value
+        self.max_linear_speed   = self.get_parameter('max_linear_speed').value
+        self.min_angular_speed  = self.get_parameter('min_angular_speed').value
+        self.max_angular_speed  = self.get_parameter('max_angular_speed').value
+        self.auto_request_next  = self.get_parameter('auto_request_next').value
 
-        self.Kp_V = self.get_parameter('Kp_V').get_parameter_value().double_value
-        self.Ki_V = self.get_parameter('Ki_V').get_parameter_value().double_value
-        self.Kd_V = self.get_parameter('Kd_V').get_parameter_value().double_value
+        # Timer for the control loop
+        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
 
-        self.Kp_Omega = self.get_parameter('Kp_Omega').get_parameter_value().double_value
-        self.Ki_Omega = self.get_parameter('Ki_Omega').get_parameter_value().double_value
-        self.Kd_Omega = self.get_parameter('Kd_Omega').get_parameter_value().double_value
+        # Dynamic reconfigure callback
+        self.add_on_set_parameters_callback(self.parameter_callback)
+        
+        # Immediately validate the initial values by calling the callback
+        init_params = [
+            Parameter('update_rate',       Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('Kp_V',              Parameter.Type.DOUBLE, self.Kp_V),
+            Parameter('Ki_V',              Parameter.Type.DOUBLE, self.Ki_V),
+            Parameter('Kd_V',              Parameter.Type.DOUBLE, self.Kd_V),
+            Parameter('Kp_Omega',          Parameter.Type.DOUBLE, self.Kp_Omega),
+            Parameter('Ki_Omega',          Parameter.Type.DOUBLE, self.Ki_Omega),
+            Parameter('Kd_Omega',          Parameter.Type.DOUBLE, self.Kd_Omega),
+            Parameter('goal_tolerance',    Parameter.Type.DOUBLE, self.goal_tolerance),
+            Parameter('heading_tolerance', Parameter.Type.DOUBLE, self.heading_tolerance),
+            Parameter('min_linear_speed',  Parameter.Type.DOUBLE, self.min_linear_speed),
+            Parameter('max_linear_speed',  Parameter.Type.DOUBLE, self.max_linear_speed),
+            Parameter('min_angular_speed', Parameter.Type.DOUBLE, self.min_angular_speed),
+            Parameter('max_angular_speed', Parameter.Type.DOUBLE, self.max_angular_speed),
+            Parameter('auto_request_next', Parameter.Type.BOOL,   self.auto_request_next),
+        ]
 
-        self.goal_tolerance = self.get_parameter('goal_tolerance').get_parameter_value().double_value
-        self.heading_tolerance = self.get_parameter('heading_tolerance').get_parameter_value().double_value
-        
-        self.min_linear_speed = self.get_parameter('min_linear_speed').get_parameter_value().double_value
-        self.max_linear_speed = self.get_parameter('max_linear_speed').get_parameter_value().double_value
-        self.min_angular_speed = self.get_parameter('min_angular_speed').get_parameter_value().double_value
-        self.max_angular_speed = self.get_parameter('max_angular_speed').get_parameter_value().double_value
-        
-        self.auto_request_next = self.get_parameter('auto_request_next').get_parameter_value().bool_value
-        
+        result: SetParametersResult = self.parameter_callback(init_params)
+        if not result.successful:
+            raise RuntimeError(f"Parameter validation failed: {result.reason}")
+
         # Robot state
         self.current_pose = Pose2D()
         self.setpoint = Pose2D()
@@ -109,40 +125,36 @@ class PIDPointController(Node):
         self.integral_e_theta = 0.0
         self.last_signed_e_d = 0.0
         self.last_e_theta = 0.0
+
+        # Limit logging frequency        
         self.last_log_time = 0.0
 
         # Publishers
         self.cmd_pub = self.create_publisher(
             Twist,
-            '/cmd_vel',
+            'cmd_vel',
             qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE)
         )
         
-        self.setpoint_pub   = self.create_publisher(Pose2D,  '/puzzlebot_real/point_PID/setpoint', 10)
-        self.signed_e_d_pub   = self.create_publisher(Float32, '/puzzlebot_real/point_PID/signed_e_d', 10)
-        self.abs_e_d_pub = self.create_publisher(Float32, '/puzzlebot_real/point_PID/abs_e_d', 10)
-        self.e_theta_pub    = self.create_publisher(Float32, '/puzzlebot_real/point_PID/e_theta', 10)
+        self.setpoint_pub   = self.create_publisher(Pose2D,  'puzzlebot_real/point_PID/setpoint', 10)
+        self.signed_e_d_pub   = self.create_publisher(Float32, 'puzzlebot_real/point_PID/signed_e_d', 10)
+        self.abs_e_d_pub = self.create_publisher(Float32, 'puzzlebot_real/point_PID/abs_e_d', 10)
+        self.e_theta_pub    = self.create_publisher(Float32, 'puzzlebot_real/point_PID/e_theta', 10)
 
         # Subscriber for odometry
         self.odom_sub = self.create_subscription(
             Odometry,
-            '/puzzlebot_real/odom',
+            'puzzlebot_real/odom',
             self.odom_callback,
             qos.qos_profile_sensor_data
         )
         
         # Service client for requesting the next waypoint
         self.next_waypoint_client = self.create_client(
-            NextPIDWaypoint, '/puzzlebot_real/point_PID/next_PID_waypoint')
+            NextPIDWaypoint, 'puzzlebot_real/point_PID/next_PID_waypoint')
         while not self.next_waypoint_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Waiting for the next_waypoint service...')
         
-        # Timer for the control loop
-        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
-
-        # Dynamic reconfigure callback
-        self.add_on_set_parameters_callback(self.parameter_callback)
-
         self.get_logger().info("PIDPointController Start.")
         
         # Request the first waypoint
@@ -408,7 +420,13 @@ class PIDPointController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PIDPointController()
+
+    try:
+        node = PIDPointController()
+    except Exception as e:
+        print(f"[FATAL] PIDPointController failed to initialize: {e}.", file=sys.stderr)
+        rclpy.shutdown()
+        return
 
     try:
         rclpy.spin(node)

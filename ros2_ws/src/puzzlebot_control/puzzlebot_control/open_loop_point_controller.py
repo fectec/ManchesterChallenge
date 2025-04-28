@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+
 import rclpy
 
 from rclpy.node import Node
@@ -27,15 +29,19 @@ class OpenLoopPointController(Node):
     def __init__(self):
         super().__init__('open_loop_point_controller')
 
-        # Declare and retrieve parameters 
-        self.declare_parameter('update_rate', 100.0)     # The frequency (Hz) at which the FSM is executed
-        update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
+        # Declare, retrieve, and validate parameters 
+        self.declare_parameter('update_rate', 100.0)    # The frequency (Hz) at which the FSM is executed
+        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
 
+        if self.update_rate <= 0.0:
+            self.get_logger().error(f"'update_rate' must be > 0 (got {self.update_rate}).")
+            raise ValueError("Invalid update_rate.")
+    
         # Publisher for the Twist message, sending commands to 'cmd_vel' topic
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
         # Subscriber to receive OpenLoopPose messages
-        self.open_loop_pose_sub = self.create_subscription(OpenLoopPose, '/puzzlebot_real/open_loop_pose', self.open_loop_pose_callback, 10)
+        self.open_loop_pose_sub = self.create_subscription(OpenLoopPose, 'puzzlebot_real/open_loop_pose', self.open_loop_pose_callback, 10)
 
         # Initialize FSM state to IDLE
         self.state = IDLE
@@ -48,7 +54,7 @@ class OpenLoopPointController(Node):
         self.cmd_start_time = None
 
         # Create a timer that triggers the finite state machine loop every certain period
-        self.timer = self.create_timer(1.0 / update_rate, self.fsm_loop)
+        self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_loop)
 
         self.get_logger().info("OpenLoopPointController Start.")  
 
@@ -99,8 +105,14 @@ class OpenLoopPointController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OpenLoopPointController()
-    
+
+    try:
+        node = OpenLoopPointController()
+    except Exception as e:
+        print(f"[FATAL] OpenLoopPointController failed to initialize: {e}.", file=sys.stderr)
+        rclpy.shutdown()
+        return
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
