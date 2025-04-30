@@ -3,8 +3,9 @@
 import sys
 
 import rclpy
-
 from rclpy.node import Node
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import SetParametersResult
 
 from geometry_msgs.msg import Twist
 from custom_interfaces.msg import OpenLoopPose
@@ -15,7 +16,7 @@ EXECUTING = 1
 
 class OpenLoopPointController(Node):
     """
-    A ROS2 node that acts as an open-loop controller for a robot. It subscribes to pose commands 
+    Node that acts as an open-loop controller for a robot. It subscribes to pose commands 
     (OpenLoopPose messages), which contain the robot's desired linear and angular velocities 
     along with their execution times. The node uses a finite state machine (FSM) to process 
     these commands, publishing velocity commands to the 'cmd_vel' topic.
@@ -29,19 +30,36 @@ class OpenLoopPointController(Node):
     def __init__(self):
         super().__init__('open_loop_point_controller')
 
-        # Declare, retrieve, and validate parameters 
-        self.declare_parameter('update_rate', 100.0)    # The frequency (Hz) at which the FSM is executed
-        self.update_rate = self.get_parameter('update_rate').get_parameter_value().double_value
+        # Declare parameters 
+        self.declare_parameter('update_rate', 100.0)    # Hz
 
-        if self.update_rate <= 0.0:
-            self.get_logger().error(f"'update_rate' must be > 0 (got {self.update_rate}).")
-            raise ValueError("Invalid update_rate.")
-    
+        # Load parameters
+        self.update_rate = self.get_parameter('update_rate').value
+
+        # Timer that triggers the finite state machine loop every certain period
+        self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_loop)
+
+        # Register the on‐set‐parameters callback
+        self.add_on_set_parameters_callback(self.parameter_callback)
+
+        # Immediately validate the initial values
+        init_params = [
+            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
+        ]
+        result = self.parameter_callback(init_params)
+        if not result.successful:
+            raise RuntimeError(f"Parameter validation failed: {result.reason}.")
+
         # Publisher for the Twist message, sending commands to 'cmd_vel' topic
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
         # Subscriber to receive OpenLoopPose messages
-        self.open_loop_pose_sub = self.create_subscription(OpenLoopPose, 'puzzlebot_real/open_loop_pose', self.open_loop_pose_callback, 10)
+        self.create_subscription(
+            OpenLoopPose, 
+            'puzzlebot_real/open_loop_pose', 
+            self.open_loop_pose_callback, 
+            10
+        )
 
         # Initialize FSM state to IDLE
         self.state = IDLE
@@ -53,9 +71,6 @@ class OpenLoopPointController(Node):
         self.current_cmd = None
         self.cmd_start_time = None
 
-        # Create a timer that triggers the finite state machine loop every certain period
-        self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_loop)
-
         self.get_logger().info("OpenLoopPointController Start.")  
 
     def open_loop_pose_callback(self, msg):
@@ -63,7 +78,7 @@ class OpenLoopPointController(Node):
         self.cmd_queue.append(msg)
         
         self.get_logger().info(
-            f"Queued command: LIN={msg.linear_velocity:.2f} ANG={msg.angular_velocity:.2f} TIME={msg.execution_time:.2f}"
+            f"Queued command: lin={msg.linear_velocity:.2f} ang={msg.angular_velocity:.2f} time={msg.execution_time:.2f}"
         )
 
     def fsm_loop(self):
@@ -102,6 +117,23 @@ class OpenLoopPointController(Node):
                 self.current_cmd = None
                 self.cmd_start_time = None
                 self.state = IDLE
+
+    def parameter_callback(self, params):
+        new = {p.name: p.value for p in params}
+
+        if 'update_rate' in new:
+            ur = float(new['update_rate'])
+            if ur <= 0.0:
+                return SetParametersResult(
+                    successful=False,
+                    reason="update_rate must be > 0."
+                )
+            self.timer.cancel()
+            self.timer = self.create_timer(1.0 / ur, self.fsm_loop)
+            self.update_rate = ur
+            self.get_logger().info(f"update_rate set to {self.update_rate} Hz.")
+
+        return SetParametersResult(successful=True)
 
 def main(args=None):
     rclpy.init(args=args)

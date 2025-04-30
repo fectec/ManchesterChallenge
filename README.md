@@ -473,7 +473,7 @@ In both modes, it is necessary to specify <code>min_linear_speed</code>, <code>m
 
 <pre><code>open_loop_path_generator:
   ros__parameters:
-    update_rate: 1.0
+    update_rate: 10.0
     waypoints_json: |
       [
         { "x": 0.0,  "y": 0.25, "total_time": 5.0 },
@@ -500,7 +500,7 @@ open_loop_point_controller:
 
 <pre><code>open_loop_path_generator:
   ros__parameters:
-    update_rate: 1.0
+    update_rate: 10.0
     waypoints_json: |
       [
         { "x": 0.25, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },

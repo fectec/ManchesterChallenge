@@ -1,7 +1,7 @@
 # Time-based "M"
 open_loop_path_generator:
   ros__parameters:
-    update_rate: 1.0
+    update_rate: 10.0
     waypoints_json: |
       [
         { "x": 0.0,  "y": 0.25, "total_time": 5.0 },

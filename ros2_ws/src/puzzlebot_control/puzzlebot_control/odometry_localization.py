@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 
-import rclpy
 import math
 import time
 import sys
 
+import rclpy
 from rclpy.node import Node
 from rclpy import qos
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import SetParametersResult
 
-from tf2_ros import TransformBroadcaster
 from puzzlebot_utils.utils.math_helpers import wrap_to_pi, yaw_to_quaternion
+from tf2_ros import TransformBroadcaster
 
 from std_msgs.msg import Float32 
-from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import TransformStamped
 
 class OdometryLocalization(Node):
     """
@@ -27,35 +29,35 @@ class OdometryLocalization(Node):
         super().__init__('odometry_localization')
 
         # Declare parameters
-        self.declare_parameter('update_rate', 200.0)
-        self.declare_parameter('integration_rate', 100.0)
-        self.declare_parameter('wheel_base', 0.173)
-        self.declare_parameter('wheel_radius', 0.0505)
+        self.declare_parameter('update_rate',      200.0)   # Hz
+        self.declare_parameter('integration_rate', 100.0)   # Hz
+        self.declare_parameter('wheel_base',       0.173)   # m
+        self.declare_parameter('wheel_radius',     0.0505)  # m
 
-        # Retrieve parameters
+        # Load parameters
         self.update_rate      = self.get_parameter('update_rate').value
         self.integration_rate = self.get_parameter('integration_rate').value
         self.wheel_base       = self.get_parameter('wheel_base').value
         self.wheel_radius     = self.get_parameter('wheel_radius').value
 
-        # Validate parameters
-        if self.update_rate <= 0.0:
-            self.get_logger().error(f"'update_rate' must be > 0 (got {self.update_rate}).")
-            raise ValueError("Invalid update_rate.")
+        # Timer for periodic updates
+        self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
 
-        if self.integration_rate <= 0.0:
-            self.get_logger().error(f"'integration_rate' must be > 0 (got {self.integration_rate}).")
-            raise ValueError("Invalid integration_rate.")
+        # Register the on‐set‐parameters callback
+        self.add_on_set_parameters_callback(self.parameter_callback)
 
-        if self.wheel_base <= 0.0:
-            self.get_logger().error(f"'wheel_base' must be > 0 (got {self.wheel_base}).")
-            raise ValueError("Invalid wheel_base.")
+        # Immediately validate the initial values
+        init_params = [
+            Parameter('update_rate',      Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('integration_rate', Parameter.Type.DOUBLE, self.integration_rate),
+            Parameter('wheel_base',       Parameter.Type.DOUBLE, self.wheel_base),
+            Parameter('wheel_radius',     Parameter.Type.DOUBLE, self.wheel_radius),
+        ]
+        result = self.parameter_callback(init_params)
+        if not result.successful:
+            raise RuntimeError(f"Parameter validation failed: {result.reason}.")
 
-        if self.wheel_radius <= 0.0:
-            self.get_logger().error(f"'wheel_radius' must be > 0 (got {self.wheel_radius}).")
-            raise ValueError("Invalid wheel_radius.")
-        
-        # Robot pose (x, y) and heading (theta in [-pi, pi])
+        # Robot pose (x, y) (m) and heading (theta in [-pi, pi] (rad))
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
@@ -64,16 +66,16 @@ class OdometryLocalization(Node):
         self.omega_r = 0.0
         self.omega_l = 0.0
 
-        # Last timestamp for integration
+        # Last timestamp for integration (s)
         self.last_time = None
         
-        # Limit logging frequency
+        # Limit logging frequency (s)
         self.last_log_time = 0.0
 
         # TF broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
    
-        # Subscribe to wheel speeds
+        # Wheel speeds subscribers
         self.create_subscription(
             Float32,
             'VelocityEncR',
@@ -94,13 +96,10 @@ class OdometryLocalization(Node):
             qos.qos_profile_sensor_data
         )   
 
-        # Timer for periodic updates
-        self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
-        
         self.get_logger().info("OdometryLocalization Start.")
 
     def right_wheel_callback(self, msg):
-        # Update right wheel angular velocity (rad/s) from the encoder#
+        # Update right wheel angular velocity (rad/s) from the encoder
         self.omega_r = msg.data
 
     def left_wheel_callback(self, msg):
@@ -180,7 +179,49 @@ class OdometryLocalization(Node):
                 f"Pose -> x: {self.x:.3f}, y: {self.y:.3f}, theta: {self.theta:.3f} rad"
             )
             self.last_log_time = current_time
-        
+
+    def parameter_callback(self, params):
+        for param in params:
+            if param.name == 'update_rate':
+                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="update_rate must be > 0."
+                    )
+                self.update_rate = float(param.value)
+                self.timer.cancel()
+                self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
+                self.get_logger().info(f"update_rate set to {self.update_rate} Hz.")
+
+            elif param.name == 'integration_rate':
+                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="integration_rate must be > 0."
+                    )
+                self.integration_rate = float(param.value)
+                self.get_logger().info(f"integration_rate set to {self.integration_rate} Hz.")
+
+            elif param.name == 'wheel_base':
+                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="wheel_base must be > 0."
+                    )
+                self.wheel_base = float(param.value)
+                self.get_logger().info(f"wheel_base set to {self.wheel_base} m.")
+
+            elif param.name == 'wheel_radius':
+                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="wheel_radius must be > 0."
+                    )
+                self.wheel_radius = float(param.value)
+                self.get_logger().info(f"wheel_radius set to {self.wheel_radius} m.")
+
+        return SetParametersResult(successful=True)
+    
 def main(args=None):
     rclpy.init(args=args)
 
