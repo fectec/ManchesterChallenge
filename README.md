@@ -505,8 +505,8 @@ open_loop_point_controller:
       [
         { "x": 0.6, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },
         { "x": 0.6, "y": -0.6, "lin_speed": 0.15, "rot_speed": 0.8 },
-        { "x": 0.0,  "y": -0.6, "lin_speed": 0.15, "rot_speed": 0.8 },
-        { "x": 0.0,  "y": 0.0, "lin_speed": 0.15, "rot_speed": 0.8 }
+        { "x": 0.0, "y": -0.6, "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.0, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 }
       ]
     min_linear_speed: 0.1
     max_linear_speed: 0.17
