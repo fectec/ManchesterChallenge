@@ -493,7 +493,7 @@ open_loop_point_controller:
 </code></pre>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dd89c229-a619-41d2-bc90-199b474b8bc5" alt="Point-to-Point Open Loop Control Demo" width="400"/>
+  <img src="https://github.com/user-attachments/assets/dd89c229-a619-41d2-bc90-199b474b8bc5" alt="Point-to-Point Open Loop Control Time-based Mode Demo" width="400"/>
 </p>
 
 <p><strong>Example – Speed-based Mode</strong></p>
@@ -503,10 +503,10 @@ open_loop_point_controller:
     update_rate: 10.0
     waypoints_json: |
       [
-        { "x": 0.25, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },
-        { "x": 0.25, "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
-        { "x": 0.0,  "y": 0.25, "lin_speed": 0.15, "rot_speed": 0.8 },
-        { "x": 0.0,  "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 }
+        { "x": 0.6, "y": 0.0,  "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.6, "y": -0.6, "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.0,  "y": 0.6, "lin_speed": 0.15, "rot_speed": 0.8 },
+        { "x": 0.0,  "y": 0.0, "lin_speed": 0.15, "rot_speed": 0.8 }
       ]
     min_linear_speed: 0.1
     max_linear_speed: 0.17
@@ -518,3 +518,7 @@ open_loop_point_controller:
   ros__parameters:
     update_rate: 100.0
 </code></pre>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dd801868-afb5-45e8-ad59-7ed309a69d7d" alt="Point-to-Point Open Loop Control Speed-based Mode Demo" width="400"/>
+</p>
