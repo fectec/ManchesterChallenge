@@ -1,12 +1,12 @@
 traffic_light_fsm:
   ros__parameters:
-    update_rate: 100.0
+    update_rate: 50.0
     green_speed: 0.17
     yellow_speed: 0.09
 
 color_blob_detection:
   ros__parameters:
-    update_rate: 100.0
+    update_rate: 50.0
     debug_view: true
 
     hsv_red1_low: [0, 100, 100]

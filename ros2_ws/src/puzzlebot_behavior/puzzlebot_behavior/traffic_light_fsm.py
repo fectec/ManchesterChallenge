@@ -115,11 +115,17 @@ class TrafficLightFSM(Node):
             Parameter("constant_linear_speed", Parameter.Type.DOUBLE, speed).to_parameter_msg()
         ]
         future = self.parameter_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-        if future.result() is not None:
-            self.get_logger().info(f"Updated speed to {speed}.")
-        else:
-            self.get_logger().error("Failed to update speed.")
+        future.add_done_callback(lambda fut: self.pid_speed_response_callback(fut, speed))
+        
+    def pid_speed_response_callback(self, future, speed):
+        try:
+            result = future.result()
+            if result is not None:
+                self.get_logger().info(f"Updated speed to {speed}.")
+            else:
+                self.get_logger().error(f"Failed to update speed to {speed}.")
+        except Exception as e:
+            self.get_logger().error(f"Error updating speed to {speed}: {str(e)}.")
 
     def fsm_update_loop(self):
             # Get current time
