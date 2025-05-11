@@ -17,7 +17,7 @@ from sensor_msgs.msg import Image
 
 from custom_interfaces.msg import ColorBlobDetection
 
-class ColorBlobDetecion(Node):
+class ColorBlobDetectionNode(Node):
     def __init__(self):
         super().__init__('color_blob_detection')
 
@@ -133,7 +133,7 @@ class ColorBlobDetecion(Node):
         # Color blob detection publisher
         self.color_blob_detection_pub = self.create_publisher(
             ColorBlobDetection, 
-            '/color_blob_detection', 
+            'puzzlebot_real/color_blob_detection', 
             10
         )
         
@@ -422,7 +422,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     try:
-        node = ColorBlobDetecion()
+        node = ColorBlobDetectionNode()
     except Exception as e:
         print(f"[FATAL] ColorBlobDetecion failed to initialize: {e}.", file=sys.stderr)
         rclpy.shutdown()

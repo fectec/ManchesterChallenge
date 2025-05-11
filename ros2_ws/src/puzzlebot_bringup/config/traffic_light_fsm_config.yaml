@@ -1,0 +1,35 @@
+color_blob_detection:
+  ros__parameters:
+    update_rate: 100.0
+    debug_view: true
+
+    hsv_red1_low: [0, 100, 100]
+    hsv_red1_high: [10, 255, 255]
+    hsv_red2_low: [160, 100, 100]
+    hsv_red2_high: [180, 255, 255]
+    hsv_green_low: [40, 70, 70]
+    hsv_green_high: [80, 255, 255]
+    hsv_yellow_low: [20, 150, 150]
+    hsv_yellow_high: [35, 255, 255]
+
+    blob_min_threshold: 30
+    blob_max_threshold: 255
+    blob_min_area: 60
+    blob_max_area: 10000000
+    blob_min_convexity: 0.1
+    blob_max_convexity: 1.0
+    blob_min_circularity: 0.5
+    blob_max_circularity: 1.0
+    blob_min_inertia_ratio: 0.5
+    blob_max_inertia_ratio: 1.0
+
+    gaussian_kernel_size: [9, 9]
+    gaussian_sigma: 2
+    grayscale_threshold: 5
+    morph_kernel_size: [3, 3]
+    morph_erode_iterations: 8
+    morph_dilate_iterations: 8
+
+traffic_light_fsm:
+  ros__parameters:
+    update_rate: 100.0
