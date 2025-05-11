@@ -70,8 +70,8 @@ class PIDPointController(Node):
         self.declare_parameter('min_angular_speed',  -1.0)          # rad/s
         self.declare_parameter('max_angular_speed',    1.0)         # rad/s
         self.declare_parameter('auto_request_next',   True)
-        self.declare_parameter('use_constant_linear_speed', True)   # Boolean to toggle constant linear speed
-        self.declare_parameter('constant_linear_speed',     1.0)    # m/s
+        self.declare_parameter('use_constant_linear_speed', False)  # Boolean to toggle constant linear speed
+        self.declare_parameter('constant_linear_speed',     0.1)    # m/s
 
         # Retrieve parameters
         self.update_rate                = self.get_parameter('update_rate').value
@@ -325,9 +325,10 @@ class PIDPointController(Node):
         self.last_e_theta = e_theta
         self.last_time = now_time
 
-        # Apply nonlinearity handling
-        V = self.apply_velocity_constraints(V, self.min_linear_speed, self.max_linear_speed)
-        Omega = self.apply_velocity_constraints(Omega, self.min_angular_speed, self.max_angular_speed)
+        if not self.use_constant_linear_speed:
+            # Apply nonlinearity handling
+            V = self.apply_velocity_constraints(V, self.min_linear_speed, self.max_linear_speed)
+            Omega = self.apply_velocity_constraints(Omega, self.min_angular_speed, self.max_angular_speed)
 
         # Publish the computed command
         cmd = Twist()
