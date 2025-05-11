@@ -10,19 +10,22 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime    REQUIRED)
 find_package(std_msgs                  REQUIRED)
 find_package(geometry_msgs             REQUIRED)
+find_package(builtin_interfaces        REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetProcessBool.srv"
   "srv/NextPIDWaypoint.srv"
   "msg/OpenLoopPose.msg"
   "msg/PIDGoalPose.msg"
-  DEPENDENCIES std_msgs geometry_msgs
+  "msg/ColorBlobDetection.msg"
+  DEPENDENCIES std_msgs geometry_msgs builtin_interfaces
 )
 
 ament_export_dependencies(
   rosidl_default_runtime
   std_msgs
   geometry_msgs
+  builtin_interfaces
 )
 
 if(BUILD_TESTING)
