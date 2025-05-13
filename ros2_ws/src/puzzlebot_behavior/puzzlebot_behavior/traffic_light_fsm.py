@@ -26,13 +26,13 @@ class TrafficLightFSM(Node):
 
         # Declare parameters
         self.declare_parameter('update_rate', 100.0)    # Hz
-        self.declare_parameter('green_speed', 0.17)     # m/s
-        self.declare_parameter('yellow_speed', 0.09)    # m/s
+        self.declare_parameter('green_proportional', 0.17)     # m/s
+        self.declare_parameter('yellow_proportional', 0.09)    # m/s
 
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
-        self.green_speed = self.get_parameter('green_speed').value
-        self.yellow_speed = self.get_parameter('yellow_speed').value
+        self.green_proportional = self.get_parameter('green_proportional').value
+        self.yellow_proportional = self.get_parameter('yellow_proportional').value
 
         # Timer for the FSM loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
@@ -43,8 +43,8 @@ class TrafficLightFSM(Node):
         # Immediately validate the initial values
         init_params = [
             Parameter('update_rate',   Parameter.Type.DOUBLE, self.update_rate),
-            Parameter('green_speed',   Parameter.Type.DOUBLE, self.green_speed),
-            Parameter('yellow_speed',  Parameter.Type.DOUBLE, self.yellow_speed)
+            Parameter('green_proportional',   Parameter.Type.DOUBLE, self.green_proportional),
+            Parameter('yellow_proportional',  Parameter.Type.DOUBLE, self.yellow_proportional)
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -80,7 +80,7 @@ class TrafficLightFSM(Node):
         while not self.pid_stop_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("/puzzlebot_real/point_PID/PID_stop service not available, waiting...")
         
-        # Create a parameter client to update the constant_linear_speed parameter
+        # Create a parameter client to update the Kp_V parameter
         self.parameter_client = self.create_client(SetParameters, 'pid_point_controller/set_parameters')
         while not self.parameter_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Waiting for /pid_point_controller/set_parameters service...')
@@ -109,23 +109,23 @@ class TrafficLightFSM(Node):
         except Exception as e:
             self.get_logger().error("PID stop service call failed: " + str(e))
 
-    def update_pid_speed(self, speed):
+    def update_pid_proportional(self, kp_v):
         req = SetParameters.Request()
         req.parameters = [
-            Parameter("constant_linear_speed", Parameter.Type.DOUBLE, speed).to_parameter_msg()
+            Parameter("Kp_V", Parameter.Type.DOUBLE, kp_v).to_parameter_msg()
         ]
         future = self.parameter_client.call_async(req)
-        future.add_done_callback(lambda fut: self.pid_speed_response_callback(fut, speed))
+        future.add_done_callback(lambda fut: self.pid_proportional_response_callback(fut, kp_v))
         
-    def pid_speed_response_callback(self, future, speed):
+    def pid_proportional_response_callback(self, future, kp_v):
         try:
             result = future.result()
             if result is not None:
-                self.get_logger().info(f"Updated speed to {speed}.")
+                self.get_logger().info(f"Updated Kp_V to {kp_v}.")
             else:
-                self.get_logger().error(f"Failed to update speed to {speed}.")
+                self.get_logger().error(f"Failed to update Kp_V to {kp_v}.")
         except Exception as e:
-            self.get_logger().error(f"Error updating speed to {speed}: {str(e)}.")
+            self.get_logger().error(f"Error updating Kp_V to {kp_v}: {str(e)}.")
 
     def fsm_update_loop(self):
             # Get current time
@@ -158,12 +158,12 @@ class TrafficLightFSM(Node):
         elif self.state == GREEN_TRAFFIC_LIGHT:
             self.call_pid_stop_service(False)
             self.get_logger().info("Resuming PID controller.")
-            self.update_pid_speed(self.green_speed)
+            self.update_pid_proportional(self.green_proportional)
 
         elif self.state == YELLOW_TRAFFIC_LIGHT:
             self.call_pid_stop_service(False)
             self.get_logger().info("Resuming PID controller.")
-            self.update_pid_speed(self.yellow_speed)
+            self.update_pid_proportional(self.yellow_proportional)
 
     def process_state_transitions(self):
         color = self.detection.color
@@ -213,23 +213,23 @@ class TrafficLightFSM(Node):
                 self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
                 self.get_logger().info(f"Update rate changed: {self.update_rate} Hz.")
 
-            elif param.name == 'green_speed':
+            elif param.name == 'green_proportional':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
                     return SetParametersResult(
                         successful=False,
-                        reason="green_speed must be a non-negative number."
+                        reason="green_proportional must be a non-negative number."
                     )
-                self.green_speed = float(param.value)
-                self.get_logger().info(f"Green speed updated: {self.green_speed}.")
+                self.green_proportional = float(param.value)
+                self.get_logger().info(f"Green Kp_V updated: {self.green_proportional}.")
 
-            elif param.name == 'yellow_speed':
+            elif param.name == 'yellow_proportional':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
                     return SetParametersResult(
                         successful=False,
-                        reason="yellow_speed must be a non-negative number."
+                        reason="yellow_proportional must be a non-negative number."
                     )
-                self.yellow_speed = float(param.value)
-                self.get_logger().info(f"Yellow speed updated: {self.yellow_speed}.")
+                self.yellow_proportional = float(param.value)
+                self.get_logger().info(f"Yellow Kp_V updated: {self.yellow_proportional}.")
         
         return SetParametersResult(successful=True)
 
