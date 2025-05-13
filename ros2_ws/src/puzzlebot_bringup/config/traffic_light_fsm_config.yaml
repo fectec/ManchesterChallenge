@@ -9,14 +9,14 @@ color_blob_detection:
     update_rate: 50.0
     debug_view: true
 
-    hsv_red1_low: [0, 100, 100]
-    hsv_red1_high: [10, 255, 255]
-    hsv_red2_low: [160, 100, 100]
-    hsv_red2_high: [180, 255, 255]
-    hsv_green_low: [40, 70, 70]
-    hsv_green_high: [80, 255, 255]
-    hsv_yellow_low: [20, 150, 150]
-    hsv_yellow_high: [35, 255, 255]
+    hsv_red1_low: [0, 120, 90]
+    hsv_red1_high: [14, 150, 203]
+    hsv_red2_low: [160, 120, 90]
+    hsv_red2_high: [180, 150, 203]
+    hsv_green_low: [65, 112, 60]
+    hsv_green_high: [88, 140, 168]
+    hsv_yellow_low: [16, 60, 85]
+    hsv_yellow_high: [45 , 240, 244]
 
     blob_min_threshold: 30
     blob_max_threshold: 255
@@ -71,5 +71,5 @@ pid_point_controller:
     min_angular_vel: -1.0
     max_angular_vel: 1.0
     auto_request_next: true
-    use_constant_linear_speed: true
+    use_constant_linear_speed: false
     constant_linear_speed: 0.1

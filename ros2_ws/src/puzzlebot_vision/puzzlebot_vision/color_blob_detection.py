@@ -221,6 +221,9 @@ class ColorBlobDetectionNode(Node):
         # Track the largest blob and its color
         largest_blob_size = 0
         largest_blob_color = ColorBlobDetection.COLOR_NONE
+
+        # Binary images dictionary for each color
+        binary_images = {}
         
         # Detect blobs for each color
         for color in [ColorBlobDetection.COLOR_GREEN, 
@@ -244,6 +247,9 @@ class ColorBlobDetectionNode(Node):
             cleaned_image = cv.erode(binary_image, kernel, iterations=self.morph_erode_iterations)
             cleaned_image = cv.dilate(cleaned_image, kernel, iterations=self.morph_dilate_iterations)
             
+            # Store the binary image for this color
+            binary_images[color] = cleaned_image.copy()
+
             # Detect blobs
             keypoints = self.blob_detector.detect(cleaned_image)
             
@@ -260,6 +266,13 @@ class ColorBlobDetectionNode(Node):
             # Start with the original image
             view_blobs = self.image.copy()
             
+
+            # Draw the original image with detected blobs with binary images
+            for color, binary_image in binary_images.items():
+                window_name = f'Binary Image - {self.color_names[color]}'
+                cv.imshow(window_name, binary_image)
+
+
             # Draw detected blobs for each color
             for color, keypoints in all_keypoints.items():
                 if keypoints:
