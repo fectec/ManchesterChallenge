@@ -2,16 +2,16 @@ odometry_localization:
   ros__parameters:
     update_rate: 200.0
     integration_rate: 100.0
-    wheel_base: 0.173
-    wheel_radius: 0.0505
+    wheel_base: 0.185
+    wheel_radius: 0.051
 
 pid_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 0.6, "y": 0.0 },
-        { "x": 0.6, "y": 0.6 },
-        { "x": 0.0, "y": 0.6 },
+        { "x": 0.8, "y": 0.0 },
+        { "x": 0.8, "y": 0.8 },
+        { "x": 0.0, "y": 0.8 },
         { "x": 0.0, "y": 0.0 }
       ]
     min_waypoint_distance: 0.1

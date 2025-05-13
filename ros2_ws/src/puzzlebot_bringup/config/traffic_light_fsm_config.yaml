@@ -9,18 +9,18 @@ color_blob_detection:
     update_rate: 50.0
     debug_view: true
 
-    hsv_red1_low: [0, 120, 90]
-    hsv_red1_high: [14, 150, 203]
-    hsv_red2_low: [160, 120, 90]
-    hsv_red2_high: [180, 150, 203]
-    hsv_green_low: [65, 112, 60]
-    hsv_green_high: [88, 140, 168]
-    hsv_yellow_low: [16, 60, 85]
-    hsv_yellow_high: [45 , 240, 244]
+    hsv_red1_low: [0, 100, 100]
+    hsv_red1_high: [10, 255, 255]
+    hsv_red2_low: [160, 100, 100]
+    hsv_red2_high: [180, 255, 255]
+    hsv_green_low: [40, 60, 50]
+    hsv_green_high: [150, 255, 255]
+    hsv_yellow_low: [15, 100, 100]
+    hsv_yellow_high: [40 , 255, 255]
 
-    blob_min_threshold: 30
+    blob_min_threshold: 20
     blob_max_threshold: 255
-    blob_min_area: 60
+    blob_min_area: 40
     blob_max_area: 10000000
     blob_min_convexity: 0.1
     blob_max_convexity: 1.0
@@ -33,23 +33,23 @@ color_blob_detection:
     gaussian_sigma: 2
     grayscale_threshold: 5
     morph_kernel_size: [3, 3]
-    morph_erode_iterations: 8
-    morph_dilate_iterations: 8
+    morph_erode_iterations: 9
+    morph_dilate_iterations: 9
 
 odometry_localization:
   ros__parameters:
     update_rate: 200.0
     integration_rate: 100.0
-    wheel_base: 0.173
-    wheel_radius: 0.0505
+    wheel_base: 0.185
+    wheel_radius: 0.051
 
 pid_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 0.6, "y": 0.0 },
-        { "x": 0.6, "y": 0.6 },
-        { "x": 0.0, "y": 0.6 },
+        { "x": 0.8, "y": 0.0 },
+        { "x": 0.8, "y": 0.8 },
+        { "x": 0.0, "y": 0.8 },
         { "x": 0.0, "y": 0.0 }
       ]
     min_waypoint_distance: 0.1
