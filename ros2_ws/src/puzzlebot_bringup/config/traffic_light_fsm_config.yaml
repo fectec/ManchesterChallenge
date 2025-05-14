@@ -2,7 +2,7 @@ traffic_light_fsm:
   ros__parameters:
     update_rate: 50.0
     green_speed: 0.17
-    yellow_speed: 0.09
+    yellow_speed: 0.14
 
 color_blob_detection:
   ros__parameters:
@@ -47,9 +47,9 @@ pid_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 0.8, "y": 0.0 },
-        { "x": 0.8, "y": 0.8 },
-        { "x": 0.0, "y": 0.8 },
+        { "x": 1.0, "y": 0.0 },
+        { "x": 1.0, "y": 1.0 },
+        { "x": 0.0, "y": 1.0 },
         { "x": 0.0, "y": 0.0 }
       ]
     min_waypoint_distance: 0.1

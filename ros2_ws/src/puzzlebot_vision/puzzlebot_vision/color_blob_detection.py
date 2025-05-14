@@ -314,16 +314,6 @@ class ColorBlobDetectionNode(Node):
                     self.bgr_colors[detection_msg.color],
                     2
                 )
-            else:
-                cv.putText(
-                    view_blobs,
-                    "NO DETECTION",
-                    (10, 30),
-                    cv.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),  # White color
-                    2
-                )
                 
             cv.imshow('Color Blob Detection Debug', view_blobs)
             cv.waitKey(1)  # Process events, wait 1 ms

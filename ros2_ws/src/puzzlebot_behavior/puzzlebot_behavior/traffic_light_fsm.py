@@ -171,7 +171,9 @@ class TrafficLightFSM(Node):
         
         if self.state == NO_TRAFFIC_LIGHT and self.pid_stopped:
             if color == ColorBlobDetection.COLOR_GREEN: next_state = GREEN_TRAFFIC_LIGHT
-            
+            elif color == ColorBlobDetection.COLOR_YELLOW: next_state = YELLOW_TRAFFIC_LIGHT
+            elif color == ColorBlobDetection.COLOR_RED: next_state = RED_TRAFFIC_LIGHT
+
         elif self.state == GREEN_TRAFFIC_LIGHT and not self.pid_stopped:
             if color == ColorBlobDetection.COLOR_YELLOW: next_state = YELLOW_TRAFFIC_LIGHT
             elif color == ColorBlobDetection.COLOR_NONE: next_state = NO_TRAFFIC_LIGHT
