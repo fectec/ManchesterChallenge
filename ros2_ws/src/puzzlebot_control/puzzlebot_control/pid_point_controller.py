@@ -70,9 +70,8 @@ class PIDPointController(Node):
         self.declare_parameter('min_angular_speed',  -1.0)          # rad/s
         self.declare_parameter('max_angular_speed',    1.0)         # rad/s
         self.declare_parameter('auto_request_next',   True)
-        self.declare_parameter('use_constant_linear_speed', False)  # Boolean to toggle constant linear speed
-        self.declare_parameter('constant_linear_speed',     0.1)    # m/s
-
+        self.declare_parameter('velocity_scale_factor', 1.0)
+    
         # Retrieve parameters
         self.update_rate                = self.get_parameter('update_rate').value
         self.Kp_V                       = self.get_parameter('Kp_V').value
@@ -88,8 +87,7 @@ class PIDPointController(Node):
         self.min_angular_speed          = self.get_parameter('min_angular_speed').value
         self.max_angular_speed          = self.get_parameter('max_angular_speed').value
         self.auto_request_next          = self.get_parameter('auto_request_next').value
-        self.use_constant_linear_speed  = self.get_parameter('use_constant_linear_speed').value
-        self.constant_linear_speed      = self.get_parameter('constant_linear_speed').value
+        self.velocity_scale_factor      = self.get_parameter('velocity_scale_factor').value
 
         # Timer for the control loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
@@ -113,8 +111,8 @@ class PIDPointController(Node):
             Parameter('min_angular_speed',          Parameter.Type.DOUBLE, self.min_angular_speed),
             Parameter('max_angular_speed',          Parameter.Type.DOUBLE, self.max_angular_speed),
             Parameter('auto_request_next',          Parameter.Type.BOOL,   self.auto_request_next),
-            Parameter('use_constant_linear_speed',  Parameter.Type.BOOL,   self.use_constant_linear_speed),
-            Parameter('constant_linear_speed',      Parameter.Type.DOUBLE, self.constant_linear_speed)
+            Parameter('velocity_scale_factor',      Parameter.Type.DOUBLE, self.velocity_scale_factor),
+
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -291,10 +289,17 @@ class PIDPointController(Node):
         # Auto-stop if both errors are below thresholds
         if abs_e_d < self.goal_tolerance and abs(e_theta) < self.heading_tolerance:
             self.cmd_pub.publish(Twist())
-            self.get_logger().info('----------------------\n'
-                                f'Waypoint {self.current_waypoint_id+1} reached at ' + 
-                                f'x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.\n'
-                                '----------------------')
+
+            GREEN = "\033[32m"
+            RESET = "\033[0m"
+
+            msg = (
+                "----------------------\n"
+                f"Waypoint {self.current_waypoint_id+1} reached at "
+                f"x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.\n"
+                "----------------------"
+            )
+            self.get_logger().info(f"{GREEN}{msg}{RESET}")
 
             # Mark the current goal as completed
             self.goal_active = False
@@ -305,15 +310,10 @@ class PIDPointController(Node):
             
             return
 
-        # Calculate linear velocity (V) based on mode
-        if self.use_constant_linear_speed:
-            # Use constant linear speed
-            V = self.constant_linear_speed
-        else:
-            # PID control for linear velocity
-            self.integral_e_d += signed_e_d * dt
-            derivative_e_d = (signed_e_d - self.last_signed_e_d) / dt
-            V = self.Kp_V * signed_e_d + self.Ki_V * self.integral_e_d + self.Kd_V * derivative_e_d
+        # PID control for linear velocity
+        self.integral_e_d += signed_e_d * dt
+        derivative_e_d = (signed_e_d - self.last_signed_e_d) / dt
+        V = self.Kp_V * signed_e_d + self.Ki_V * self.integral_e_d + self.Kd_V * derivative_e_d
 
         # PID control for angular velocity
         self.integral_e_theta += e_theta * dt
@@ -325,10 +325,12 @@ class PIDPointController(Node):
         self.last_e_theta = e_theta
         self.last_time = now_time
 
-        if not self.use_constant_linear_speed:
-            # Apply nonlinearity handling
-            V = self.apply_velocity_constraints(V, self.min_linear_speed, self.max_linear_speed)
-            Omega = self.apply_velocity_constraints(Omega, self.min_angular_speed, self.max_angular_speed)
+        # Apply nonlinearity handling
+        V = self.apply_velocity_constraints(V, self.min_linear_speed, self.max_linear_speed)
+        Omega = self.apply_velocity_constraints(Omega, self.min_angular_speed, self.max_angular_speed)
+
+        # Scale the final velocity output
+        V = V * self.velocity_scale_factor    
 
         # Publish the computed command
         cmd = Twist()
@@ -446,23 +448,15 @@ class PIDPointController(Node):
                 self.auto_request_next = param.value
                 self.get_logger().info(f"Auto‐request next waypoint: {self.auto_request_next}.")
             
-            elif param.name == 'use_constant_linear_speed':
-                if not isinstance(param.value, bool):
-                    return SetParametersResult(
-                        successful=False,
-                        reason="use_constant_linear_speed must be a boolean value."
-                    )
-                self.use_constant_linear_speed = param.value
-
-            elif param.name == 'constant_linear_speed':
+            elif param.name == 'velocity_scale_factor':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
                     return SetParametersResult(
                         successful=False,
-                        reason="constant_linear_speed must be a non-negative number."
+                        reason="velocity_scale_factor must be a non-negative number."
                     )
-                self.constant_linear_speed = float(param.value)
-                self.get_logger().info(f"Constant linear speed updated: {self.constant_linear_speed}.")
-        
+                self.velocity_scale_factor = float(param.value)
+                self.get_logger().info(f"Velocity scale factor updated: {self.velocity_scale_factor}.")
+
         return SetParametersResult(successful=True)
 
 def main(args=None):

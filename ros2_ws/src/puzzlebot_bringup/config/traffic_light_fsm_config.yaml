@@ -1,8 +1,9 @@
 traffic_light_fsm:
   ros__parameters:
     update_rate: 50.0
-    green_proportional: 0.45
-    yellow_proportional: 0.10
+    color_detection_timeout: 0.5 
+    green_velocity_scale: 1.0
+    yellow_velocity_scale: 0.6
 
 color_blob_detection:
   ros__parameters:
@@ -13,62 +14,61 @@ color_blob_detection:
     hsv_red1_high: [10, 255, 255]
     hsv_red2_low: [160, 100, 100]
     hsv_red2_high: [180, 255, 255]
-    hsv_green_low: [40, 60, 50]
+    hsv_green_low: [40, 60, 40]
     hsv_green_high: [110, 255, 255]
-    hsv_yellow_low: [15, 100, 100]
+    hsv_yellow_low: [15, 100, 90]
     hsv_yellow_high: [40 , 255, 255]
 
-    blob_min_threshold: 20
-    blob_max_threshold: 255
-    blob_min_area: 40
+    blob_min_threshold: 30
+    blob_max_threshold: 200
+    blob_min_area: 50
     blob_max_area: 10000000
-    blob_min_convexity: 0.1
+    blob_min_convexity: 0.2
     blob_max_convexity: 1.0
-    blob_min_circularity: 0.5
+    blob_min_circularity: 0.2
     blob_max_circularity: 1.0
-    blob_min_inertia_ratio: 0.5
+    blob_min_inertia_ratio: 0.2
     blob_max_inertia_ratio: 1.0
 
     gaussian_kernel_size: [9, 9]
     gaussian_sigma: 2
     grayscale_threshold: 5
     morph_kernel_size: [3, 3]
-    morph_erode_iterations: 9
-    morph_dilate_iterations: 9
+    morph_erode_iterations: 4
+    morph_dilate_iterations: 4
 
 odometry_localization:
   ros__parameters:
-    update_rate: 200.0
+    update_rate: 100.0
     integration_rate: 100.0
-    wheel_base: 0.185
+    wheel_base: 0.19
     wheel_radius: 0.051
 
 pid_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 0.8, "y": 0.0 },
-        { "x": 1.6, "y": 0.8 },
-        { "x": 2.4, "y": -0.8 }
+        { "x": 0.6, "y": 0.0 },
+        { "x": 1.2, "y": 0.6 },
+        { "x": 1.8, "y": 0.6 },
+        { "x": 2.4, "y": 0.0 }
       ]
     min_waypoint_distance: 0.1
     max_waypoint_distance: 2.0
 
 pid_point_controller:
   ros__parameters:
-    update_rate: 100.0
+    update_rate: 50.0
     Kp_V: 0.15
     Ki_V: 0.0
     Kd_V: 0.0
-    Kp_Omega: 0.1
+    Kp_Omega: 0.09
     Ki_Omega: 0.0
     Kd_Omega: 0.0
     goal_tolerance: 0.08
-    heading_tolerance: 0.08
-    min_linear_vel: 0.10
-    max_linear_vel: 0.20
-    min_angular_vel: -1.0
-    max_angular_vel: 1.0
+    heading_tolerance: 0.09
+    min_linear_vel: 0.1
+    max_linear_vel: 0.17
+    min_angular_vel: -0.15
+    max_angular_vel: 0.15
     auto_request_next: true
-    use_constant_linear_speed: false
-    constant_linear_speed: 0.1

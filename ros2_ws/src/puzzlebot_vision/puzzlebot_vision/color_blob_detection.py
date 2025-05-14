@@ -140,7 +140,8 @@ class ColorBlobDetectionNode(Node):
         # Raw camera images subscriber
         self.create_subscription(
             Image,
-            'video_source/raw',
+            # 'video_source/raw',
+            '/image_raw',
             self.image_callback,
             qos.qos_profile_sensor_data
         )
@@ -268,9 +269,9 @@ class ColorBlobDetectionNode(Node):
             
 
             # Draw the original image with detected blobs with binary images
-            for color, binary_image in binary_images.items():
-                window_name = f'Binary Image - {self.color_names[color]}'
-                cv.imshow(window_name, binary_image)
+            # for color, binary_image in binary_images.items():
+            #     window_name = f'Binary Image - {self.color_names[color]}'
+            #     cv.imshow(window_name, binary_image)
 
 
             # Draw detected blobs for each color

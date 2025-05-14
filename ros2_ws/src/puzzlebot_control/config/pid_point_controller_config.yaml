@@ -9,10 +9,10 @@ pid_path_generator:
   ros__parameters:
     waypoints_json: |
       [
-        { "x": 0.8, "y": 0.0 },
-        { "x": 0.8, "y": 0.8 },
-        { "x": 0.0, "y": 0.8 },
-        { "x": 0.0, "y": 0.0 }
+        { "x": 0.6, "y": 0.0 },
+        { "x": 1.2, "y": 0.6 },
+        { "x": 1.8, "y": 0.6 },
+        { "x": 2.4, "y": 0.0 }
       ]
     min_waypoint_distance: 0.1
     max_waypoint_distance: 2.0
@@ -33,4 +33,3 @@ pid_point_controller:
     min_angular_vel: -1.0
     max_angular_vel: 1.0
     auto_request_next: true
-    use_constant_linear_speed: false
