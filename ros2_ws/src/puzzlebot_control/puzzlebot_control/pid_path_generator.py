@@ -19,10 +19,13 @@ from custom_interfaces.srv import NextPIDWaypoint
 class PIDPathGenerator(Node):
     """
     Provides waypoints as a service for a PID controller.
+
     Waypoints are loaded from the ROS parameter 'waypoints_json' as a JSON array of
-    objects containing 'x' and 'y' coordinates.  Consecutive waypoints must lie within
-    [min_waypoint_distance, max_waypoint_distance].  The node serves each waypoint via
-    the '/puzzlebot_real/point_PID/next_PID_waypoint' service when requested.
+    objects containing 'x' and 'y' coordinates.
+
+    Consecutive waypoints must lie within [min_waypoint_distance, max_waypoint_distance].
+
+    The node serves each waypoint via the 'point_pid/next_pid_waypoint' service when requested.
     """
 
     def __init__(self):
@@ -57,7 +60,7 @@ class PIDPathGenerator(Node):
         # Create a service to provide the next waypoint
         self.create_service(
             NextPIDWaypoint, 
-            'puzzlebot_real/point_PID/next_PID_waypoint', 
+            'point_pid/next_pid_waypoint', 
             self.next_waypoint_callback
         )
         
@@ -110,11 +113,14 @@ class PIDPathGenerator(Node):
         return response
     
     def shutdown_node(self):
-        # Cleanly shutdown the node once all waypoints are served
+        """
+        Cleanly shutdown the node once all waypoints are served.
+        """
         self.get_logger().info('PIDPathGenerator shutting down.')
         rclpy.shutdown()
 
-    def parameter_callback(self, params):
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """Validates and applies updated node parameters."""
         new = {p.name: p.value for p in params}
 
         if 'min_waypoint_distance' in new:
@@ -125,7 +131,7 @@ class PIDPathGenerator(Node):
                     reason="min_waypoint_distance must be ≥ 0."
                 )
             self.min_waypoint_distance = md
-            self.get_logger().info(f"min_waypoint_distance set to {self.min_waypoint_distance} m.")
+            self.get_logger().info(f"min_waypoint_distance updated: {self.min_waypoint_distance} m.")
 
         if 'max_waypoint_distance' in new:
             Md = float(new['max_waypoint_distance'])
@@ -135,7 +141,7 @@ class PIDPathGenerator(Node):
                     reason="max_waypoint_distance must be > min_waypoint_distance."
                 )
             self.max_waypoint_distance = Md
-            self.get_logger().info(f"max_waypoint_distance set to {self.max_waypoint_distance} m.")
+            self.get_logger().info(f"max_waypoint_distance updated: {self.max_waypoint_distance} m.")
 
         if 'waypoints_json' in new:
             raw = new['waypoints_json']
@@ -186,7 +192,7 @@ class PIDPathGenerator(Node):
 
             self.waypoints_json = raw
             self.waypoints      = wps
-            self.get_logger().info(f"waypoints_json loaded with {len(self.waypoints)} waypoints.")
+            self.get_logger().info(f"waypoints_json updated with: {len(self.waypoints)} waypoints.")
 
         return SetParametersResult(successful=True)
 

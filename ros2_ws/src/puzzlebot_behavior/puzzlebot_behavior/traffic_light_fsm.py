@@ -21,14 +21,22 @@ YELLOW_TRAFFIC_LIGHT = 2
 RED_TRAFFIC_LIGHT = 3
 
 class TrafficLightFSM(Node):
+    """ 
+    Implements a finite state machine (FSM) for traffic light-based robot behavior control.
+    
+    It subscribes to color blob detection messages and transitions between NO_TRAFFIC_LIGHT, GREEN, YELLOW, and RED states
+    based on the detected traffic light color. The node controls a PID controller via services to pause or resume movement,
+    and dynamically adjusts velocity scaling parameters according to the active light state.
+    """
+
     def __init__(self):
         super().__init__('traffic_light_fsm')
 
         # Declare parameters
-        self.declare_parameter('update_rate', 100.0)    # Hz
-        self.declare_parameter('color_detection_timeout', 0.5)  # seconds
-        self.declare_parameter('green_velocity_scale', 1.0)    # scale factor
-        self.declare_parameter('yellow_velocity_scale', 0.6)   # scale factor
+        self.declare_parameter('update_rate', 50.0)             # Hz
+        self.declare_parameter('color_detection_timeout', 0.5)  # s
+        self.declare_parameter('green_velocity_scale', 1.0)     
+        self.declare_parameter('yellow_velocity_scale', 0.6)    
 
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
@@ -44,10 +52,10 @@ class TrafficLightFSM(Node):
 
         # Immediately validate the initial values
         init_params = [
-            Parameter('update_rate',   Parameter.Type.DOUBLE, self.update_rate),
-            Parameter('color_detection_timeout', Parameter.Type.DOUBLE, self.color_detection_timeout),
-            Parameter('green_velocity_scale', Parameter.Type.DOUBLE, self.green_velocity_scale),
-            Parameter('yellow_velocity_scale', Parameter.Type.DOUBLE, self.yellow_velocity_scale)
+            Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
+            Parameter('color_detection_timeout',    Parameter.Type.DOUBLE,  self.color_detection_timeout),
+            Parameter('green_velocity_scale',       Parameter.Type.DOUBLE,  self.green_velocity_scale),
+            Parameter('yellow_velocity_scale',      Parameter.Type.DOUBLE,  self.yellow_velocity_scale)
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -70,61 +78,54 @@ class TrafficLightFSM(Node):
         self.last_time = None
 
         # Flag for tracking PID controller status
-        self.pid_stopped = True  # Assume PID is initially stopped
+        self.pid_stopped = True  
 
         # Subscriber for color blob detection
         self.create_subscription(
             ColorBlobDetection,
-            'puzzlebot_real/color_blob_detection',
+            'color_blob_detection',
             self.color_blob_callback,
             10
         )
         
-        # Create a client for stopping/resuming the PID controller via a service
-        self.pid_stop_client = self.create_client(SetBool, 'puzzlebot_real/point_PID/PID_stop')
-        while not self.pid_stop_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info("/puzzlebot_real/point_PID/PID_stop service not available, waiting...")
+        # Create a client for stopping or resuming the PID controller via a service
+        self.pid_toggle_client = self.create_client(SetBool, 'point_pid/pid_toggle')
+        while not self.pid_toggle_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info("point_pid/pid_toggle service not available, waiting...")
         
-        # Create a parameter client to update the Kp_V parameter
-        self.parameter_client = self.create_client(SetParameters, 'pid_point_controller/set_parameters')
-        while not self.parameter_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for /pid_point_controller/set_parameters service...')
-
-        self.process_state_actions()
+        # Create a parameter client to update the PID parameters
+        self.pid_parameter_client = self.create_client(SetParameters, 'pid_point_controller/set_parameters')
+        while not self.pid_parameter_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('pid_point_controller/set_parameters service not available, waiting...')
+        
         self.get_logger().info('TrafficLightFSM Start.')
+        self.process_state_actions()
 
-    def color_blob_callback(self, msg):
-        # Store the detection and set a flag
+    def color_blob_callback(self, msg: ColorBlobDetection) -> None:
+        """Receives color blob detection data and marks it as a new detection."""
         self.detection = msg
         self.new_detection = True
 
-    def call_pid_stop_service(self, stop):
-        # Prepare a service request for stopping (if stop==True) or resuming (if stop==False) the PID controller
+    def call_pid_toggle_service(self, stop: bool) -> None:
+        """Sends a request to stop or resume the PID controller."""
         req = SetBool.Request()
         req.data = stop
-        future = self.pid_stop_client.call_async(req)
-        # Use asynchronous callback so that the timer thread is not blocked
-        future.add_done_callback(lambda fut: self.pid_stop_response_callback(fut, stop))    
+        future = self.pid_toggle_client.call_async(req)
+        future.add_done_callback(lambda fut: self.pid_toggle_response_callback(fut, stop))    
 
-    def pid_stop_response_callback(self, future, stop):
+    def pid_toggle_response_callback(self, future, stop: bool) -> None:
+        """Processes the result of the stop or resume PID service call."""
         try:
             result = future.result()
             self.pid_stopped = stop
-            self.get_logger().info(f"PID stop service call successful: {'stopping' if stop else 'resuming'} PID.")
+            self.get_logger().info(f"PID toggle service call successful: {'stopping' if stop else 'resuming'} PID.")
         except Exception as e:
-            self.get_logger().error("PID stop service call failed: " + str(e))
+            self.get_logger().error("PID toggle service call failed: " + str(e))
         
-    def update_pid_parameter(self, param_name, param_value):
-        """
-        Updates a single parameter in the PID controller
-        
-        Args:
-            param_name (str): Name of the parameter to update
-            param_value: Value to set the parameter to (type will be inferred)
-        """
+    def update_pid_parameter(self, param_name: str, param_value) -> None:
+        """Requests an update to a parameter of the PID controller."""
         req = SetParameters.Request()
         
-        # Determine parameter type based on value
         if isinstance(param_value, bool):
             param_type = Parameter.Type.BOOL
         elif isinstance(param_value, (int, float)):
@@ -135,21 +136,17 @@ class TrafficLightFSM(Node):
             self.get_logger().error(f"Unsupported parameter type for {param_name}: {type(param_value)}.")
             return
         
-        # Create parameter message    
         req.parameters = [
             Parameter(param_name, param_type, param_value).to_parameter_msg()
         ]
         
-        # Call the service asynchronously
-        future = self.parameter_client.call_async(req)
+        future = self.pid_parameter_client.call_async(req)
         future.add_done_callback(
             lambda fut: self.pid_parameter_response_callback(fut, param_name, param_value)
         )
 
-    def pid_parameter_response_callback(self, future, param_name, param_value):
-        """
-        Callback for parameter update service response
-        """
+    def pid_parameter_response_callback(self, future, param_name: str, param_value) -> None:
+        """Processes the response from the PID parameter update service."""
         try:
             result = future.result()
             if result is not None and any(result.results):
@@ -162,11 +159,12 @@ class TrafficLightFSM(Node):
         except Exception as e:
             self.get_logger().error(f"Error updating {param_name} to {param_value}: {str(e)}.")
 
-    def fsm_update_loop(self):
+    def fsm_update_loop(self) -> None:
+        """Main FSM loop that checks detection and transitions between states."""
         # Get current time
-        self.now_time = self.get_clock().now().nanoseconds * 1e-9  # seconds
+        self.now_time = self.get_clock().now().nanoseconds * 1e-9  # s
 
-        # Initialization on first run
+        # Initialization on the first run
         if self.last_time is None:
             self.last_time = self.now_time
             return
@@ -204,27 +202,25 @@ class TrafficLightFSM(Node):
             
             self.new_detection = False
 
-    def process_state_actions(self):
+    def process_state_actions(self) -> None:
+        """Performs actions based on the current FSM state."""
         if (self.state == NO_TRAFFIC_LIGHT or self.state == RED_TRAFFIC_LIGHT):
-            # Stop
-            self.call_pid_stop_service(True)
-            self.get_logger().info("Stopping PID controller.")
+            self.call_pid_toggle_service(True)
             
         elif self.state == GREEN_TRAFFIC_LIGHT:
-            self.call_pid_stop_service(False)
-            self.get_logger().info("Resuming PID controller.")
-            
+            self.call_pid_toggle_service(False)
+
             # Set velocity scaling for GREEN
             self.update_pid_parameter("velocity_scale_factor", self.green_velocity_scale)
 
         elif self.state == YELLOW_TRAFFIC_LIGHT:
-            self.call_pid_stop_service(False)
-            self.get_logger().info("Resuming PID controller.")
+            self.call_pid_toggle_service(False)
             
             # Set velocity scaling for YELLOW
             self.update_pid_parameter("velocity_scale_factor", self.yellow_velocity_scale)
 
-    def process_state_transitions(self, color):
+    def process_state_transitions(self, color: int) -> None:
+        """Handles transitions between FSM states based on detected color."""
         next_state = self.state
         
         if self.state == NO_TRAFFIC_LIGHT and self.pid_stopped:
@@ -233,27 +229,23 @@ class TrafficLightFSM(Node):
         elif self.state == GREEN_TRAFFIC_LIGHT and not self.pid_stopped:
             if color == ColorBlobDetection.COLOR_YELLOW: next_state = YELLOW_TRAFFIC_LIGHT
             elif color == ColorBlobDetection.COLOR_NONE: next_state = NO_TRAFFIC_LIGHT
-            elif color == ColorBlobDetection.COLOR_RED: next_state = RED_TRAFFIC_LIGHT
 
         elif self.state == YELLOW_TRAFFIC_LIGHT and not self.pid_stopped:
             if color == ColorBlobDetection.COLOR_RED: next_state = RED_TRAFFIC_LIGHT
             elif color == ColorBlobDetection.COLOR_NONE: next_state = NO_TRAFFIC_LIGHT
-            elif color == ColorBlobDetection.COLOR_GREEN: next_state = GREEN_TRAFFIC_LIGHT
 
         elif self.state == RED_TRAFFIC_LIGHT and self.pid_stopped:
             if color == ColorBlobDetection.COLOR_GREEN: next_state = GREEN_TRAFFIC_LIGHT
             elif color == ColorBlobDetection.COLOR_NONE: next_state = NO_TRAFFIC_LIGHT
-            elif color == ColorBlobDetection.COLOR_YELLOW: next_state = YELLOW_TRAFFIC_LIGHT
 
-        # Apply state transition if needed
         if next_state != self.state:
             self.get_logger().info(f'{self._state_name(self.state)} → {self._state_name(next_state)}.')
             self.state = next_state
                         
-            # Process current state actions
             self.process_state_actions()
 
-    def _state_name(self, s):
+    def _state_name(self, s: int) -> str:
+        """Returns the string representation of a given FSM state."""
         return {
             NO_TRAFFIC_LIGHT: 'NO_TRAFFIC_LIGHT',
             GREEN_TRAFFIC_LIGHT: 'GREEN_TRAFFIC_LIGHT',
@@ -261,7 +253,11 @@ class TrafficLightFSM(Node):
             RED_TRAFFIC_LIGHT: 'RED_TRAFFIC_LIGHT'
         }[s]
     
-    def parameter_callback(self, params):
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """Validates and applies updated node parameters."""
+        new_green_scale = self.green_velocity_scale
+        new_yellow_scale = self.yellow_velocity_scale
+
         for param in params:
             if param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -269,40 +265,72 @@ class TrafficLightFSM(Node):
                         successful=False,
                         reason="update_rate must be > 0."
                     )
-                self.update_rate = float(param.value)
-                self.timer.cancel()
-                self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
-                self.get_logger().info(f"Update rate changed: {self.update_rate} Hz.")
-                
+
             elif param.name == 'color_detection_timeout':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
                     return SetParametersResult(
                         successful=False,
                         reason="color_detection_timeout must be a non-negative number."
                     )
-                self.color_detection_timeout = float(param.value)
-                self.get_logger().info(f"Color detection timeout updated: {self.color_detection_timeout}.")
-                
-            elif param.name == 'green_velocity_scale':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="green_velocity_scale must be a non-negative number."
-                    )
-                self.green_velocity_scale = float(param.value)
-                self.get_logger().info(f"Green velocity scale updated: {self.green_velocity_scale}.")
-                
-            elif param.name == 'yellow_velocity_scale':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="yellow_velocity_scale must be a non-negative number."
-                    )
-                self.yellow_velocity_scale = float(param.value)
-                self.get_logger().info(f"Yellow velocity scale updated: {self.yellow_velocity_scale}.")
-        
-        return SetParametersResult(successful=True)
 
+            elif param.name == 'green_velocity_scale':
+                if not isinstance(param.value, (int, float)):
+                    return SetParametersResult(
+                        successful=False,
+                        reason="green_velocity_scale must be a number."
+                    )
+                new_green_scale = float(param.value)
+
+            elif param.name == 'yellow_velocity_scale':
+                if not isinstance(param.value, (int, float)):
+                    return SetParametersResult(
+                        successful=False,
+                        reason="yellow_velocity_scale must be a number."
+                    )
+                new_yellow_scale = float(param.value)
+
+        # Validate green and yellow velocity scales
+        if not (0.0 < new_green_scale <= 1.0):
+            return SetParametersResult(
+                successful=False,
+                reason="green_velocity_scale must be > 0.0 and ≤ 1.0."
+            )
+
+        if not (0.0 < new_yellow_scale <= 1.0):
+            return SetParametersResult(
+                successful=False,
+                reason="yellow_velocity_scale must be > 0.0 and ≤ 1.0."
+            )
+
+        # Ensure yellow is less than green
+        if not (new_yellow_scale < new_green_scale):
+            return SetParametersResult(
+                successful=False,
+                reason="yellow_velocity_scale must be strictly less than green_velocity_scale."
+            )
+
+        # Apply parameters if all are valid
+        for param in params:
+            if param.name == 'update_rate':
+                self.update_rate = float(param.value)
+                self.timer.cancel()
+                self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
+                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
+
+            elif param.name == 'color_detection_timeout':
+                self.color_detection_timeout = float(param.value)
+                self.get_logger().info(f"color_detection_timeout updated: {self.color_detection_timeout} s.")
+
+            elif param.name == 'green_velocity_scale':
+                self.green_velocity_scale = new_green_scale
+                self.get_logger().info(f"green_velocity_scale updated: {self.green_velocity_scale}.")
+
+            elif param.name == 'yellow_velocity_scale':
+                self.yellow_velocity_scale = new_yellow_scale
+                self.get_logger().info(f"yellow_velocity_scale updated: {self.yellow_velocity_scale}.")
+
+        return SetParametersResult(successful=True)
+    
 def main(args=None):
     rclpy.init(args=args)
 

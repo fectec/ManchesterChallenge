@@ -18,6 +18,11 @@ from sensor_msgs.msg import Image
 from custom_interfaces.msg import ColorBlobDetection
 
 class ColorBlobDetectionNode(Node):
+    """
+    Performs color blob detection from camera images.
+    Publishes the color of the largest detected blob to a custom message topic.
+    Supported colors: RED, GREEN, YELLOW (with double HSV range for RED).
+    """
     def __init__(self):
         super().__init__('color_blob_detection')
 
@@ -94,32 +99,32 @@ class ColorBlobDetectionNode(Node):
 
         # Immediately validate the initial values
         init_params = [
-            Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
-            Parameter('debug_view',                 Parameter.Type.BOOL,    self.debug_view),
-            Parameter('hsv_red1_low',               Parameter.Type.INTEGER_ARRAY, self.hsv_red1_low),
-            Parameter('hsv_red1_high',              Parameter.Type.INTEGER_ARRAY, self.hsv_red1_high),
-            Parameter('hsv_red2_low',               Parameter.Type.INTEGER_ARRAY, self.hsv_red2_low),
-            Parameter('hsv_red2_high',              Parameter.Type.INTEGER_ARRAY, self.hsv_red2_high),
-            Parameter('hsv_green_low',              Parameter.Type.INTEGER_ARRAY, self.hsv_green_low),
-            Parameter('hsv_green_high',             Parameter.Type.INTEGER_ARRAY, self.hsv_green_high),
-            Parameter('hsv_yellow_low',             Parameter.Type.INTEGER_ARRAY, self.hsv_yellow_low),
-            Parameter('hsv_yellow_high',            Parameter.Type.INTEGER_ARRAY, self.hsv_yellow_high),
-            Parameter('blob_min_threshold',         Parameter.Type.INTEGER, self.blob_min_threshold),
-            Parameter('blob_max_threshold',         Parameter.Type.INTEGER, self.blob_max_threshold),
-            Parameter('blob_min_area',              Parameter.Type.INTEGER, self.blob_min_area),
-            Parameter('blob_max_area',              Parameter.Type.INTEGER, self.blob_max_area),
-            Parameter('blob_min_convexity',         Parameter.Type.DOUBLE,  self.blob_min_convexity),
-            Parameter('blob_max_convexity',         Parameter.Type.DOUBLE,  self.blob_max_convexity),
-            Parameter('blob_min_circularity',       Parameter.Type.DOUBLE,  self.blob_min_circularity),
-            Parameter('blob_max_circularity',       Parameter.Type.DOUBLE,  self.blob_max_circularity),
-            Parameter('blob_min_inertia_ratio',     Parameter.Type.DOUBLE,  self.blob_min_inertia_ratio),
-            Parameter('blob_max_inertia_ratio',     Parameter.Type.DOUBLE,  self.blob_max_inertia_ratio),
-            Parameter('gaussian_kernel_size',       Parameter.Type.INTEGER_ARRAY, self.gaussian_kernel_size),
-            Parameter('gaussian_sigma',             Parameter.Type.INTEGER, self.gaussian_sigma),
-            Parameter('grayscale_threshold',        Parameter.Type.INTEGER, self.grayscale_threshold),
-            Parameter('morph_kernel_size',          Parameter.Type.INTEGER_ARRAY, self.morph_kernel_size),
-            Parameter('morph_erode_iterations',     Parameter.Type.INTEGER, self.morph_erode_iterations),
-            Parameter('morph_dilate_iterations',    Parameter.Type.INTEGER, self.morph_dilate_iterations),
+            Parameter('update_rate',                Parameter.Type.DOUBLE,          self.update_rate),
+            Parameter('debug_view',                 Parameter.Type.BOOL,            self.debug_view),
+            Parameter('hsv_red1_low',               Parameter.Type.INTEGER_ARRAY,   self.hsv_red1_low),
+            Parameter('hsv_red1_high',              Parameter.Type.INTEGER_ARRAY,   self.hsv_red1_high),
+            Parameter('hsv_red2_low',               Parameter.Type.INTEGER_ARRAY,   self.hsv_red2_low),
+            Parameter('hsv_red2_high',              Parameter.Type.INTEGER_ARRAY,   self.hsv_red2_high),
+            Parameter('hsv_green_low',              Parameter.Type.INTEGER_ARRAY,   self.hsv_green_low),
+            Parameter('hsv_green_high',             Parameter.Type.INTEGER_ARRAY,   self.hsv_green_high),
+            Parameter('hsv_yellow_low',             Parameter.Type.INTEGER_ARRAY,   self.hsv_yellow_low),
+            Parameter('hsv_yellow_high',            Parameter.Type.INTEGER_ARRAY,   self.hsv_yellow_high),
+            Parameter('blob_min_threshold',         Parameter.Type.INTEGER,         self.blob_min_threshold),
+            Parameter('blob_max_threshold',         Parameter.Type.INTEGER,         self.blob_max_threshold),
+            Parameter('blob_min_area',              Parameter.Type.INTEGER,         self.blob_min_area),
+            Parameter('blob_max_area',              Parameter.Type.INTEGER,         self.blob_max_area),
+            Parameter('blob_min_convexity',         Parameter.Type.DOUBLE,          self.blob_min_convexity),
+            Parameter('blob_max_convexity',         Parameter.Type.DOUBLE,          self.blob_max_convexity),
+            Parameter('blob_min_circularity',       Parameter.Type.DOUBLE,          self.blob_min_circularity),
+            Parameter('blob_max_circularity',       Parameter.Type.DOUBLE,          self.blob_max_circularity),
+            Parameter('blob_min_inertia_ratio',     Parameter.Type.DOUBLE,          self.blob_min_inertia_ratio),
+            Parameter('blob_max_inertia_ratio',     Parameter.Type.DOUBLE,          self.blob_max_inertia_ratio),
+            Parameter('gaussian_kernel_size',       Parameter.Type.INTEGER_ARRAY,   self.gaussian_kernel_size),
+            Parameter('gaussian_sigma',             Parameter.Type.INTEGER,         self.gaussian_sigma),
+            Parameter('grayscale_threshold',        Parameter.Type.INTEGER,         self.grayscale_threshold),
+            Parameter('morph_kernel_size',          Parameter.Type.INTEGER_ARRAY,   self.morph_kernel_size),
+            Parameter('morph_erode_iterations',     Parameter.Type.INTEGER,         self.morph_erode_iterations),
+            Parameter('morph_dilate_iterations',    Parameter.Type.INTEGER,         self.morph_dilate_iterations),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -133,15 +138,14 @@ class ColorBlobDetectionNode(Node):
         # Color blob detection publisher
         self.color_blob_detection_pub = self.create_publisher(
             ColorBlobDetection, 
-            'puzzlebot_real/color_blob_detection', 
+            'color_blob_detection', 
             10
         )
         
         # Raw camera images subscriber
         self.create_subscription(
             Image,
-            # 'video_source/raw',
-            '/image_raw',
+            'image_raw',
             self.image_callback,
             qos.qos_profile_sensor_data
         )
@@ -181,7 +185,6 @@ class ColorBlobDetectionNode(Node):
             ColorBlobDetection.COLOR_GREEN: (0, 255, 0),
             ColorBlobDetection.COLOR_YELLOW: (0, 255, 255),
             ColorBlobDetection.COLOR_RED: (0, 0, 255),
-            ColorBlobDetection.COLOR_NONE: (255, 255, 255)
         }
 
         # Create the blob detector object with configured parameters
@@ -189,15 +192,16 @@ class ColorBlobDetectionNode(Node):
 
         self.get_logger().info("ColorBlobDetection Start.")
 
-    def image_callback(self, msg):
-        # Callback to receive image from the camera and convert to CV2 format
+    def image_callback(self, msg: Image) -> None:
+        """Callback to convert ROS image to OpenCV format and store it."""
         try:
             self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}.")
             return
     
-    def timer_callback(self):
+    def timer_callback(self) -> None:
+        """Main timer function to process images and detect color blobs."""
         # Check if image has been received
         if self.image is None:
             return
@@ -267,13 +271,6 @@ class ColorBlobDetectionNode(Node):
             # Start with the original image
             view_blobs = self.image.copy()
             
-
-            # Draw the original image with detected blobs with binary images
-            # for color, binary_image in binary_images.items():
-            #     window_name = f'Binary Image - {self.color_names[color]}'
-            #     cv.imshow(window_name, binary_image)
-
-
             # Draw detected blobs for each color
             for color, keypoints in all_keypoints.items():
                 if keypoints:
@@ -330,12 +327,25 @@ class ColorBlobDetectionNode(Node):
         # Set the detected color to the one with the largest blob
         if largest_blob_color != ColorBlobDetection.COLOR_NONE:
             detection_msg.color = largest_blob_color
-            self.get_logger().debug(f"Detected color: {self.color_names[detection_msg.color]}")
-        
+
+            color_codes = {
+                'RED': '\033[91m',    
+                'GREEN': '\033[92m',   
+                'YELLOW': '\033[93m',  
+                'ENDC': '\033[0m'    
+            }
+
+            color_str = self.color_names[detection_msg.color]
+            color_code = color_codes.get(color_str.upper(), '')
+            end_code = color_codes['ENDC']
+
+            self.get_logger().debug(f"Detected color: {color_code}{color_str}{end_code}.")
+
         # Publish the detection message
         self.color_blob_detection_pub.publish(detection_msg)
 
-    def parameter_callback(self, params):
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """Validates and applies updated node parameters."""
         blob_params_changed = False
 
         for param in params:
@@ -348,19 +358,19 @@ class ColorBlobDetectionNode(Node):
                 self.update_rate = float(value)
                 self.timer.cancel()
                 self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-                self.get_logger().info(f"Update rate changed to {self.update_rate} Hz.")
+                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif name == 'debug_view':
                 if not isinstance(value, bool):
                     return SetParametersResult(successful=False, reason="debug_view must be a boolean.")
                 self.debug_view = value
-                self.get_logger().info(f"Debug view set to {self.debug_view}.")
+                self.get_logger().info(f"debug_view updated: {self.debug_view}.")
 
             elif name.startswith('hsv_'):
                 if not (isinstance(value, list) and len(value) == 3 and all(isinstance(v, int) and v >= 0 for v in value)):
                     return SetParametersResult(successful=False, reason=f"{name} must be a list of 3 non-negative integers.")
                 setattr(self, name, value)
-                self.get_logger().info(f"{name} updated to {value}.")
+                self.get_logger().info(f"{name} updated: {value}.")
 
             elif name in (
                 'blob_min_threshold', 'blob_max_threshold',
@@ -372,7 +382,7 @@ class ColorBlobDetectionNode(Node):
                 if not isinstance(value, int) or value < 0:
                     return SetParametersResult(successful=False, reason=f"{name} must be a non-negative integer.")
                 setattr(self, name, value)
-                self.get_logger().info(f"{name} updated to {value}")
+                self.get_logger().info(f"{name} updated: {value}.")
                 blob_params_changed = True
 
             elif name in (
@@ -383,21 +393,22 @@ class ColorBlobDetectionNode(Node):
                 if not isinstance(value, (int, float)) or not (0.0 <= value <= 1.0):
                     return SetParametersResult(successful=False, reason=f"{name} must be between 0.0 and 1.0.")
                 setattr(self, name, float(value))
-                self.get_logger().info(f"{name} updated to {value}")
+                self.get_logger().info(f"{name} updated: {value}.")
                 blob_params_changed = True
 
             elif name in ('gaussian_kernel_size', 'morph_kernel_size'):
                 if not (isinstance(value, list) and len(value) == 2 and all(isinstance(v, int) and v > 0 for v in value)):
                     return SetParametersResult(successful=False, reason=f"{name} must be a list of 2 positive integers.")
                 setattr(self, name, value)
-                self.get_logger().info(f"{name} updated to {value}.")
+                self.get_logger().info(f"{name} updated: {value}.")
 
         if blob_params_changed:
             self.configure_blob_detector()
 
         return SetParametersResult(successful=True)
 
-    def configure_blob_detector(self):
+    def configure_blob_detector(self) -> None:
+        """Configure OpenCV SimpleBlobDetector with loaded parameters."""
         params = cv.SimpleBlobDetector_Params()
         params.minThreshold = self.blob_min_threshold
         params.maxThreshold = self.blob_max_threshold

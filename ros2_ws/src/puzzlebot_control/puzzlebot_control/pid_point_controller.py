@@ -26,13 +26,13 @@ class PIDPointController(Node):
     robot toward a desired goal pose (x_g, y_g, theta_g) based on current odometry (x_r, y_r, theta_r).
 
     Subscribes to:
-      - /puzzlebot_real/odom (nav_msgs/Odometry): Current robot pose and orientation
+      - odom (nav_msgs/Odometry): Current robot pose and orientation
     
     Service Clients:
-      - /puzzlebot_real/point_PID/next_PID_waypoint (custom_interfaces/srv/NextPIDWaypoint): Requests the next waypoint
+      - point_pid/next_pid_waypoint (custom_interfaces/srv/NextPIDWaypoint): Requests the next waypoint
     
     Publishes to:
-      - /cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
+      - cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
 
     Control logic:
       - Compute global position errors:
@@ -48,8 +48,8 @@ class PIDPointController(Node):
 
     The robot stops when both the absolute distance and angular errors are below the tolerances.
 
-    This node also includes a service (/puzzlebot_real/point_PID/PID_stop) that, when called, forces the controller to publish a zero Twist.
-    In addition, if a new waypoint is received (via /puzzlebot_real/point_PID/waypoint), the controller automatically resumes.
+    This node also includes a service (point_pid/pid_toggle) that can force the controller to publish a zero Twist.
+    In addition, if a new waypoint is received (via point_pid/waypoint), the controller automatically resumes.
     """
 
     def __init__(self):
@@ -146,27 +146,27 @@ class PIDPointController(Node):
             qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE)
         )
         
-        self.waypoint_pub   = self.create_publisher(Pose2D,  'puzzlebot_real/point_PID/waypoint', 10)
-        self.signed_e_d_pub   = self.create_publisher(Float32, 'puzzlebot_real/point_PID/signed_e_d', 10)
-        self.abs_e_d_pub = self.create_publisher(Float32, 'puzzlebot_real/point_PID/abs_e_d', 10)
-        self.e_theta_pub    = self.create_publisher(Float32, 'puzzlebot_real/point_PID/e_theta', 10)
+        self.waypoint_pub   = self.create_publisher(Pose2D,  'point_pid/waypoint', 10)
+        self.signed_e_d_pub   = self.create_publisher(Float32, 'point_PID/signed_e_d', 10)
+        self.abs_e_d_pub = self.create_publisher(Float32, 'point_PID/abs_e_d', 10)
+        self.e_theta_pub    = self.create_publisher(Float32, 'point_PID/e_theta', 10)
 
         # Subscriber for odometry
         self.create_subscription(
             Odometry,
-            'puzzlebot_real/odom',
+            'odom',
             self.odom_callback,
             qos.qos_profile_sensor_data
         )
         
         # Service client for requesting the next waypoint
         self.next_waypoint_client = self.create_client(
-            NextPIDWaypoint, 'puzzlebot_real/point_PID/next_PID_waypoint')
+            NextPIDWaypoint, 'point_pid/next_pid_waypoint')
         while not self.next_waypoint_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for the next_waypoint service...')
+            self.get_logger().info('point_pid/next_pid_waypoint service not available, waiting...')
 
-        # Service server to allow external stopping/resuming of PID output
-        self.create_service(SetBool, 'puzzlebot_real/point_PID/PID_stop', self.pid_stop_callback)
+        # Service server to allow external stopping or resuming of PID output
+        self.create_service(SetBool, 'point_pid/pid_toggle', self.pid_toggle_callback)
         self.pid_stop = False  
 
         # Request the first waypoint
@@ -174,28 +174,23 @@ class PIDPointController(Node):
 
         self.get_logger().info("PIDPointController Start.")
     
-    def odom_callback(self, msg):
-        # Update x, y
+    def odom_callback(self, msg: Odometry) -> None:
+        """Update the current robot pose from odometry message."""
         self.current_pose.x = msg.pose.pose.position.x
         self.current_pose.y = msg.pose.pose.position.y
-
-        # Convert the incoming orientation quaternion to Euler angles,
-        # then store the yaw component
         q = msg.pose.pose.orientation
         roll, pitch, yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
         self.current_pose.theta = yaw
     
-    def request_next_waypoint(self, previous_reached=True):
-        # Request the next waypoint from the service provider
+    def request_next_waypoint(self, previous_reached: bool = True) -> None:
+        """Request the next waypoint from the waypoint service."""
         request = NextPIDWaypoint.Request()
         request.previous_reached = previous_reached
-        
-        # Send the request
         future = self.next_waypoint_client.call_async(request)
         future.add_done_callback(self.process_waypoint_response)
     
-    def process_waypoint_response(self, future):
-        # Process the response from the waypoint service
+    def process_waypoint_response(self, future) -> None:
+        """Process the asynchronous response containing the next waypoint."""
         try:
             response = future.result()
             
@@ -203,19 +198,15 @@ class PIDPointController(Node):
                 self.get_logger().info("Path completed! No more waypoints available.")
                 self.path_completed = True
                 self.goal_active = False
-                
-                # Stop the robot
                 self.cmd_pub.publish(Twist())
                 return
             
-            # Process and publish the new waypoint
             self.current_waypoint_id = response.waypoint_id
             self.waypoint.x = response.goal.pose.position.x
             self.waypoint.y = response.goal.pose.position.y
             self.waypoint.theta = response.goal.theta
             self.waypoint_pub.publish(self.waypoint)
             
-            # Reset PID state for the new goal
             self.last_time = None
             self.integral_e_d = 0.0
             self.integral_e_theta = 0.0
@@ -223,24 +214,30 @@ class PIDPointController(Node):
             self.last_e_theta = 0.0
             self.goal_active = True
             
-            self.get_logger().info(f'New waypoint {self.current_waypoint_id+1}: ' +
-                                   f'x={self.waypoint.x:.2f}, y={self.waypoint.y:.2f}.')
-        
+            BLUE = "\033[1;34m"  
+            RESET = "\033[0m"     
+
+            msg = (
+                f"New waypoint {self.current_waypoint_id + 1} -> "
+                f"x={self.waypoint.x:.2f}, y={self.waypoint.y:.2f}."
+            )
+            self.get_logger().info(f"{BLUE}{msg}{RESET}")
+
         except Exception as e:
             self.get_logger().error(f"Error processing waypoint response: {e}.")
 
-    def pid_stop_callback(self, request, response):
+    def pid_toggle_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
+        """Service callback to start or stop the PID controller output."""
         self.pid_stop = request.data
         response.success = True
         if self.pid_stop:
             response.message = "PID controller stopped."
-            self.get_logger().info("Received PID stop command.")
         else:
             response.message = "PID controller resumed."
-            self.get_logger().info("Received PID resume command.")
         return response
     
-    def control_loop(self):
+    def control_loop(self) -> None:
+        """Main control loop running at update_rate; computes and publishes velocity commands."""
         # Run PID control only when a goal is active
         if not self.goal_active or self.path_completed:
             return
@@ -290,17 +287,15 @@ class PIDPointController(Node):
         if abs_e_d < self.goal_tolerance and abs(e_theta) < self.heading_tolerance:
             self.cmd_pub.publish(Twist())
 
-            GREEN = "\033[32m"
+            PURPLE = "\033[1;35m"
             RESET = "\033[0m"
 
             msg = (
-                "----------------------\n"
-                f"Waypoint {self.current_waypoint_id+1} reached at "
-                f"x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}.\n"
-                "----------------------"
+                f"Waypoint {self.current_waypoint_id + 1} reached at "
+                f"x={self.current_pose.x:.3f}, y={self.current_pose.y:.3f}."
             )
-            self.get_logger().info(f"{GREEN}{msg}{RESET}")
-
+            self.get_logger().info(f"{PURPLE}{msg}{RESET}")
+            
             # Mark the current goal as completed
             self.goal_active = False
             
@@ -342,12 +337,13 @@ class PIDPointController(Node):
         current_time = time.time()
         if current_time - self.last_log_time > 1.0:  # Log once per second at most
             self.get_logger().info(
-                f"Control: dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}."
+                f"Control -> dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
             )
             self.last_log_time = current_time
 
-    def apply_velocity_constraints(self, velocity, min_vel, max_vel):
-        if abs(velocity) < 0.01:    # Effectively zero
+    def apply_velocity_constraints(self, velocity: float, min_vel: float, max_vel: float) -> float:
+        """Clamp the velocity to specified minimum and maximum limits."""
+        if abs(velocity) < 0.01:    
             return 0.0
             
         # Apply minimum threshold (to overcome friction/inertia)
@@ -360,7 +356,8 @@ class PIDPointController(Node):
             
         return velocity
 
-    def parameter_callback(self, params):
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """Validates and applies updated node parameters."""
         for param in params:
             if param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -371,7 +368,7 @@ class PIDPointController(Node):
                 self.update_rate = float(param.value)
                 self.timer.cancel()
                 self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
-                self.get_logger().info(f"Update rate changed: {self.update_rate} Hz.")
+                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name in (
                 'Kp_V', 'Ki_V', 'Kd_V',
@@ -392,7 +389,7 @@ class PIDPointController(Node):
                         reason="goal_tolerance must be a non-negative number."
                     )
                 self.goal_tolerance = float(param.value)
-                self.get_logger().info(f"Goal tolerance updated: {self.goal_tolerance}.")
+                self.get_logger().info(f"goal_tolerance updated: {self.goal_tolerance} m.")
 
             elif param.name == 'heading_tolerance':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
@@ -401,7 +398,7 @@ class PIDPointController(Node):
                         reason="heading_tolerance must be a non-negative number."
                     )
                 self.heading_tolerance = float(param.value)
-                self.get_logger().info(f"Heading tolerance updated: {self.heading_tolerance}.")
+                self.get_logger().info(f"heading_tolerance updated: {self.heading_tolerance} m.")
 
             elif param.name == 'min_linear_speed':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
@@ -410,7 +407,7 @@ class PIDPointController(Node):
                         reason="min_linear_speed must be a non-negative number."
                     )
                 self.min_linear_speed = float(param.value)
-                self.get_logger().info(f"Min linear speed updated: {self.min_linear_speed}.")
+                self.get_logger().info(f"min_linear_speed updated: {self.min_linear_speed} m/s.")
 
             elif param.name == 'max_linear_speed':
                 if not isinstance(param.value, (int, float)):
@@ -419,7 +416,7 @@ class PIDPointController(Node):
                         reason="max_linear_speed must be a number."
                     )
                 self.max_linear_speed = float(param.value)
-                self.get_logger().info(f"Max linear speed updated: {self.max_linear_speed}.")
+                self.get_logger().info(f"max_linear_speed updated: {self.max_linear_speed} m/s.")
 
             elif param.name == 'min_angular_speed':
                 if not isinstance(param.value, (int, float)):
@@ -428,7 +425,7 @@ class PIDPointController(Node):
                         reason="min_angular_speed must be a number."
                     )
                 self.min_angular_speed = float(param.value)
-                self.get_logger().info(f"Min angular speed updated: {self.min_angular_speed}.")
+                self.get_logger().info(f"min_angular_speed updated: {self.min_angular_speed} rad/s.")
 
             elif param.name == 'max_angular_speed':
                 if not isinstance(param.value, (int, float)):
@@ -437,7 +434,7 @@ class PIDPointController(Node):
                         reason="max_angular_speed must be a number."
                     )
                 self.max_angular_speed = float(param.value)
-                self.get_logger().info(f"Max angular speed updated: {self.max_angular_speed}.")
+                self.get_logger().info(f"max_angular_speed updated: {self.max_angular_speed} rad/s.")
 
             elif param.name == 'auto_request_next':
                 if not isinstance(param.value, bool):
@@ -446,7 +443,7 @@ class PIDPointController(Node):
                         reason="auto_request_next must be true or false."
                     )
                 self.auto_request_next = param.value
-                self.get_logger().info(f"Auto‐request next waypoint: {self.auto_request_next}.")
+                self.get_logger().info(f"auto_request_next updated: {self.auto_request_next}.")
             
             elif param.name == 'velocity_scale_factor':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
@@ -455,7 +452,7 @@ class PIDPointController(Node):
                         reason="velocity_scale_factor must be a non-negative number."
                     )
                 self.velocity_scale_factor = float(param.value)
-                self.get_logger().info(f"Velocity scale factor updated: {self.velocity_scale_factor}.")
+                self.get_logger().info(f"velocity_scale_factor updated: {self.velocity_scale_factor}.")
 
         return SetParametersResult(successful=True)
 

@@ -8,4 +8,4 @@ uint8 COLOR_YELLOW = 2  # Yellow blob: Drive slowly, until you see a red light t
 uint8 COLOR_RED    = 3  # Red blob: Stop until you see a green light
 
 # Current detection data:
-uint8   color        # One of the COLOR_* constants above
+uint8   color           # One of the COLOR_* constants above

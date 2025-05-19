@@ -20,8 +20,9 @@ from geometry_msgs.msg import TransformStamped
 class OdometryLocalization(Node):
     """
     Estimates the robot's pose (x, y, theta) by dead reckoning, using the angular
-    velocities of the left and right wheels of a differential-drive robot. The 
-    robot's position and orientation are updated over time using Euler integration
+    velocities of the left and right wheels of a differential-drive robot.
+
+    The robot's position and orientation are updated over time using Euler integration
     of the kinematic model.
     """
 
@@ -92,26 +93,22 @@ class OdometryLocalization(Node):
         # Odometry publisher
         self.odom_pub = self.create_publisher(
             Odometry,
-            'puzzlebot_real/odom',
+            'odom',
             qos.qos_profile_sensor_data
         )   
 
         self.get_logger().info("OdometryLocalization Start.")
 
-    def right_wheel_callback(self, msg):
-        # Update right wheel angular velocity (rad/s) from the encoder
+    def right_wheel_callback(self, msg: Float32) -> None:
+        """Callback to update the right wheel's angular velocity from encoder data."""
         self.omega_r = msg.data
 
-    def left_wheel_callback(self, msg):
-        # Update left wheel angular velocity (rad/s) from the encoder
+    def left_wheel_callback(self, msg: Float32) -> None:
+        """Callback to update the left wheel's angular velocity from encoder data."""
         self.omega_l = msg.data
 
-    def update_odometry(self):
-        """
-        Integrate the differential-drive equations using dt
-        to update (x, y, theta), publish the odometry message,
-        and broadcast the corresponding TF transform.
-        """
+    def update_odometry(self) -> None:
+        """Computes and updates robot pose using Euler integration and publishes odometry."""
         # Get current time
         now = self.get_clock().now()
         now_time = now.nanoseconds * 1e-9
@@ -180,7 +177,8 @@ class OdometryLocalization(Node):
             )
             self.last_log_time = current_time
 
-    def parameter_callback(self, params):
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """Validates and applies updated node parameters."""
         for param in params:
             if param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -191,7 +189,7 @@ class OdometryLocalization(Node):
                 self.update_rate = float(param.value)
                 self.timer.cancel()
                 self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
-                self.get_logger().info(f"update_rate set to {self.update_rate} Hz.")
+                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name == 'integration_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -200,7 +198,7 @@ class OdometryLocalization(Node):
                         reason="integration_rate must be > 0."
                     )
                 self.integration_rate = float(param.value)
-                self.get_logger().info(f"integration_rate set to {self.integration_rate} Hz.")
+                self.get_logger().info(f"integration_rate updated: {self.integration_rate} Hz.")
 
             elif param.name == 'wheel_base':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -209,7 +207,7 @@ class OdometryLocalization(Node):
                         reason="wheel_base must be > 0."
                     )
                 self.wheel_base = float(param.value)
-                self.get_logger().info(f"wheel_base set to {self.wheel_base} m.")
+                self.get_logger().info(f"wheel_base updated: {self.wheel_base} m.")
 
             elif param.name == 'wheel_radius':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -218,7 +216,7 @@ class OdometryLocalization(Node):
                         reason="wheel_radius must be > 0."
                     )
                 self.wheel_radius = float(param.value)
-                self.get_logger().info(f"wheel_radius set to {self.wheel_radius} m.")
+                self.get_logger().info(f"wheel_radius updated: {self.wheel_radius} m.")
 
         return SetParametersResult(successful=True)
     
