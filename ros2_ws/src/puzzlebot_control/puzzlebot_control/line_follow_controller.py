@@ -43,15 +43,15 @@ class LineFollowController(Node):
         super().__init__('line_follow_controller')
         
         # Declare parameters
-        self.declare_parameter('update_rate',         60.0)         # Hz
-        self.declare_parameter('linear_velocity',     0.03)         # m/s 
-        self.declare_parameter('Kp_Omega',            0.9)          
-        self.declare_parameter('Ki_Omega',            0.0)          
-        self.declare_parameter('Kd_Omega',            0.1)          
-        self.declare_parameter('max_angular_speed',   0.9)          # rad/s 
-        self.declare_parameter('line_timeout',        0.5)          # s 
+        self.declare_parameter('update_rate',           60.0)         # Hz
+        self.declare_parameter('linear_velocity',       0.03)         # m/s 
+        self.declare_parameter('Kp_Omega',              0.9)          
+        self.declare_parameter('Ki_Omega',              0.0)          
+        self.declare_parameter('Kd_Omega',              0.1)          
+        self.declare_parameter('max_angular_speed',     0.9)          # rad/s 
+        self.declare_parameter('line_timeout',          0.5)          # s 
         self.declare_parameter('velocity_scale_factor', 1.0)       
-        self.declare_parameter('steering_deadband',   0.05)         
+        self.declare_parameter('steering_deadband',    0.05)         
     
         # Retrieve parameters
         self.update_rate                = self.get_parameter('update_rate').value

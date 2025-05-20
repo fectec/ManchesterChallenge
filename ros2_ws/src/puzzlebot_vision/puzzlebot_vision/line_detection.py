@@ -14,9 +14,9 @@ from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
 
-class BirdEyeViewLaneDetection(Node):
+class LineDectection(Node):
     def __init__(self):
-        super().__init__('birdeye_lane_detection')
+        super().__init__('line_detection')
 
         # Declare parameters
         self.declare_parameter('update_rate', 30.0)
@@ -84,26 +84,26 @@ class BirdEyeViewLaneDetection(Node):
         
         # Validate initial parameters
         init_params = [
-            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
-            Parameter('target_width', Parameter.Type.INTEGER, self.target_width),
-            Parameter('target_height', Parameter.Type.INTEGER, self.target_height),
-            Parameter('perspective_tl_x', Parameter.Type.INTEGER, self.perspective_tl_x),
-            Parameter('perspective_tl_y', Parameter.Type.INTEGER, self.perspective_tl_y),
-            Parameter('perspective_bl_x', Parameter.Type.INTEGER, self.perspective_bl_x),
-            Parameter('perspective_bl_y', Parameter.Type.INTEGER, self.perspective_bl_y),
-            Parameter('perspective_tr_x', Parameter.Type.INTEGER, self.perspective_tr_x),
-            Parameter('perspective_tr_y', Parameter.Type.INTEGER, self.perspective_tr_y),
-            Parameter('perspective_br_x', Parameter.Type.INTEGER, self.perspective_br_x),
-            Parameter('perspective_br_y', Parameter.Type.INTEGER, self.perspective_br_y),
-            Parameter('gaussian_kernel_size', Parameter.Type.INTEGER, self.gaussian_kernel_size),
-            Parameter('gaussian_sigma', Parameter.Type.INTEGER, self.gaussian_sigma),
-            Parameter('grayscale_threshold', Parameter.Type.INTEGER, self.grayscale_threshold),
-            Parameter('morph_kernel_size', Parameter.Type.INTEGER, self.morph_kernel_size),
-            Parameter('morph_erode_iterations', Parameter.Type.INTEGER, self.morph_erode_iterations),
-            Parameter('morph_dilate_iterations', Parameter.Type.INTEGER, self.morph_dilate_iterations),
-            Parameter('min_contour_area', Parameter.Type.INTEGER, self.min_contour_area),
-            Parameter('max_contour_area', Parameter.Type.INTEGER, self.max_contour_area),
-            Parameter('filter_alpha', Parameter.Type.DOUBLE, self.filter_alpha),
+            Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
+            Parameter('target_width',               Parameter.Type.INTEGER, self.target_width),
+            Parameter('target_height',              Parameter.Type.INTEGER, self.target_height),
+            Parameter('perspective_tl_x',           Parameter.Type.INTEGER, self.perspective_tl_x),
+            Parameter('perspective_tl_y',           Parameter.Type.INTEGER, self.perspective_tl_y),
+            Parameter('perspective_bl_x',           Parameter.Type.INTEGER, self.perspective_bl_x),
+            Parameter('perspective_bl_y',           Parameter.Type.INTEGER, self.perspective_bl_y),
+            Parameter('perspective_tr_x',           Parameter.Type.INTEGER, self.perspective_tr_x),
+            Parameter('perspective_tr_y',           Parameter.Type.INTEGER, self.perspective_tr_y),
+            Parameter('perspective_br_x',           Parameter.Type.INTEGER, self.perspective_br_x),
+            Parameter('perspective_br_y',           Parameter.Type.INTEGER, self.perspective_br_y),
+            Parameter('gaussian_kernel_size',       Parameter.Type.INTEGER, self.gaussian_kernel_size),
+            Parameter('gaussian_sigma',             Parameter.Type.INTEGER, self.gaussian_sigma),
+            Parameter('grayscale_threshold',        Parameter.Type.INTEGER, self.grayscale_threshold),
+            Parameter('morph_kernel_size',          Parameter.Type.INTEGER, self.morph_kernel_size),
+            Parameter('morph_erode_iterations',     Parameter.Type.INTEGER, self.morph_erode_iterations),
+            Parameter('morph_dilate_iterations',    Parameter.Type.INTEGER, self.morph_dilate_iterations),
+            Parameter('min_contour_area',           Parameter.Type.INTEGER, self.min_contour_area),
+            Parameter('max_contour_area',           Parameter.Type.INTEGER, self.max_contour_area),
+            Parameter('filter_alpha',               Parameter.Type.DOUBLE,  self.filter_alpha),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -127,7 +127,7 @@ class BirdEyeViewLaneDetection(Node):
         
         # Subscriber
         self.subscription = self.create_subscription(
-            Image, 'Image', self.image_callback, qos.qos_profile_sensor_data
+            Image, 'raw_image', self.image_callback, qos.qos_profile_sensor_data
         )
      
         self.get_logger().info('BirdEyeViewLaneDetection node started.')
@@ -431,9 +431,9 @@ def main(args=None):
     rclpy.init(args=args)
 
     try:
-        node = BirdEyeViewLaneDetection()
+        node = LineDectection()
     except Exception as e:
-        print(f"[FATAL] BirdEyeViewLaneDetection failed to initialize: {e}", file=sys.stderr)
+        print(f"[FATAL] LineDectection failed to initialize: {e}", file=sys.stderr)
         rclpy.shutdown()
         return
     
