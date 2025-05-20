@@ -30,6 +30,7 @@ install(PROGRAMS
   ${PROJECT_NAME}/odometry_localization.py
   ${PROJECT_NAME}/pid_path_generator.py
   ${PROJECT_NAME}/pid_point_controller.py
+  ${PROJECT_NAME}/line_follow_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

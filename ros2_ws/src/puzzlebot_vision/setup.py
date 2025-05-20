@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'color_blob_detection = puzzlebot_vision.color_blob_detection:main',
+            'line_detection = puzzlebot_vision.line_detection:main',
         ],
     },
 )
