@@ -25,15 +25,15 @@ class LineDectection(Node):
         
         # Bird's eye view perspective transformation points
         # These should be calibrated for your specific camera setup
-        self.declare_parameter('perspective_tl_x', 100)  # Top-left
-        self.declare_parameter('perspective_tl_y', 420)
-        self.declare_parameter('perspective_bl_x', 120)  # Bottom-left
+        self.declare_parameter('perspective_tl_x', 250)  # Top-left
+        self.declare_parameter('perspective_tl_y', 400)
+        self.declare_parameter('perspective_bl_x', 250)  # Bottom-left
         self.declare_parameter('perspective_bl_y', 470)
-        self.declare_parameter('perspective_tr_x', 450)  # Top-right
-        self.declare_parameter('perspective_tr_y', 420)
-        self.declare_parameter('perspective_br_x', 450)  # Bottom-right
+        self.declare_parameter('perspective_tr_x', 390)  # Top-right
+        self.declare_parameter('perspective_tr_y', 400)
+        self.declare_parameter('perspective_br_x', 390)  # Bottom-right
         self.declare_parameter('perspective_br_y', 470)
-        
+
         # Gaussian blur parameters
         self.declare_parameter('gaussian_kernel_size', 5)
         self.declare_parameter('gaussian_sigma', 5)
@@ -127,10 +127,10 @@ class LineDectection(Node):
         
         # Subscriber
         self.subscription = self.create_subscription(
-            Image, 'raw_image', self.image_callback, qos.qos_profile_sensor_data
+            Image, 'image_raw', self.image_callback, qos.qos_profile_sensor_data
         )
      
-        self.get_logger().info('BirdEyeViewLaneDetection node started.')
+        self.get_logger().info('LineDectection node started.')
 
     def update_perspective_matrices(self):
         """Update perspective transformation matrices based on current parameters."""
