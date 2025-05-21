@@ -13,7 +13,7 @@ from rcl_interfaces.msg import SetParametersResult
 
 from puzzlebot_utils.utils.vision_helpers import get_color_mask
 
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image,CompressedImage
 
 from custom_interfaces.msg import ColorBlobDetection
 
@@ -24,7 +24,7 @@ class ColorBlobDetectionNode(Node):
     Supported colors: RED, GREEN, YELLOW (with double HSV range for RED).
     """
     def __init__(self):
-        super().__init__('color_blob_detection')
+        super().__init__('color_blob_detection_node')
 
         # Declare parameters
         self.declare_parameter('update_rate',   100.0)    # Hz
@@ -144,8 +144,8 @@ class ColorBlobDetectionNode(Node):
         
         # Raw camera images subscriber
         self.create_subscription(
-            Image,
-            'image_raw',
+            CompressedImage,
+            'image_raw/compressed',
             self.image_callback,
             qos.qos_profile_sensor_data
         )
@@ -192,10 +192,11 @@ class ColorBlobDetectionNode(Node):
 
         self.get_logger().info("ColorBlobDetection Start.")
 
-    def image_callback(self, msg: Image) -> None:
+    def image_callback(self, msg: CompressedImage) -> None:
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            #self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}.")
             return
