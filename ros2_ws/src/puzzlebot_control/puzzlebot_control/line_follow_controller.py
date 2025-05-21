@@ -44,11 +44,11 @@ class LineFollowController(Node):
         
         # Declare parameters
         self.declare_parameter('update_rate',           60.0)         # Hz
-        self.declare_parameter('linear_velocity',       0.03)         # m/s 
-        self.declare_parameter('Kp_Omega',              0.3)          
-        self.declare_parameter('Ki_Omega',              0.0)          
+        self.declare_parameter('linear_velocity',       0.06)         # m/s 
+        self.declare_parameter('Kp_Omega',              0.2)          
+        self.declare_parameter('Ki_Omega',              0.1)          
         self.declare_parameter('Kd_Omega',              0.1)          
-        self.declare_parameter('max_angular_speed',     1.0)          # rad/s 
+        self.declare_parameter('max_angular_speed',     1.5)          # rad/s 
         self.declare_parameter('line_timeout',          0.5)          # s 
         self.declare_parameter('velocity_scale_factor', 1.0)       
         self.declare_parameter('steering_deadband',    0.06)         
@@ -113,7 +113,7 @@ class LineFollowController(Node):
         )
         
         # Publishers for debugging/monitoring
-        self.angular_cmd_pub = self.create_publisher(Float32, 'line_follow/angular_cmd', 10)
+        self.angular_cmd_pub = self.create_publisher(Float32, 'line_pid/angular_cmd', 10)
 
         # Subscriber for line detection centroid error
         self.create_subscription(
@@ -124,7 +124,7 @@ class LineFollowController(Node):
         )
         
         # Service server to enable/disable controller
-        self.create_service(SetBool, 'line_follow/controller_toggle', self.controller_toggle_callback)
+        self.create_service(SetBool, 'line_pid/pid_toggle', self.pid_toggle_callback)
 
         self.get_logger().info("LineFollowController Start.")
     
@@ -135,7 +135,7 @@ class LineFollowController(Node):
         self.last_line_time = self.get_clock().now().nanoseconds * 1e-9
         self.has_received_data = True  
         
-    def controller_toggle_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
+    def pid_toggle_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
         """Service callback to enable or disable the controller output."""
         self.controller_enabled = not request.data  
         response.success = True

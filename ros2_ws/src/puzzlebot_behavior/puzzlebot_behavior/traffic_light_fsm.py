@@ -37,12 +37,16 @@ class TrafficLightFSM(Node):
         self.declare_parameter('color_detection_timeout', 0.5)  # s
         self.declare_parameter('green_velocity_scale', 1.0)     
         self.declare_parameter('yellow_velocity_scale', 0.6)    
+        self.declare_parameter('pid_toggle_service', 'point_pid/pid_toggle')
+        self.declare_parameter('pid_parameter_service', 'pid_point_controller/set_parameters')
 
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
         self.color_detection_timeout = self.get_parameter('color_detection_timeout').value
         self.green_velocity_scale = self.get_parameter('green_velocity_scale').value
         self.yellow_velocity_scale = self.get_parameter('yellow_velocity_scale').value
+        self.pid_toggle_service = self.get_parameter('pid_toggle_service').value
+        self.pid_parameter_service = self.get_parameter('pid_parameter_service').value
 
         # Timer for the FSM loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
@@ -55,7 +59,9 @@ class TrafficLightFSM(Node):
             Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
             Parameter('color_detection_timeout',    Parameter.Type.DOUBLE,  self.color_detection_timeout),
             Parameter('green_velocity_scale',       Parameter.Type.DOUBLE,  self.green_velocity_scale),
-            Parameter('yellow_velocity_scale',      Parameter.Type.DOUBLE,  self.yellow_velocity_scale)
+            Parameter('yellow_velocity_scale',      Parameter.Type.DOUBLE,  self.yellow_velocity_scale),
+            Parameter('pid_toggle_service',          Parameter.Type.STRING,  self.pid_toggle_service),
+            Parameter('pid_parameter_service',       Parameter.Type.STRING,  self.pid_parameter_service)
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -89,14 +95,14 @@ class TrafficLightFSM(Node):
         )
         
         # Create a client for stopping or resuming the PID controller via a service
-        self.pid_toggle_client = self.create_client(SetBool, 'point_pid/pid_toggle')
+        self.pid_toggle_client = self.create_client(SetBool, self.pid_toggle_service)
         while not self.pid_toggle_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info("point_pid/pid_toggle service not available, waiting...")
+            self.get_logger().info(f"{self.pid_toggle_service} service not available, waiting...")
         
         # Create a parameter client to update the PID parameters
-        self.pid_parameter_client = self.create_client(SetParameters, 'pid_point_controller/set_parameters')
+        self.pid_parameter_client = self.create_client(SetParameters, self.pid_parameter_service)
         while not self.pid_parameter_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('pid_point_controller/set_parameters service not available, waiting...')
+            self.get_logger().info(f'{self.pid_parameter_service} service not available, waiting...')
         
         self.get_logger().info('TrafficLightFSM Start.')
         self.process_state_actions()
@@ -289,6 +295,20 @@ class TrafficLightFSM(Node):
                     )
                 new_yellow_scale = float(param.value)
 
+            elif param.name == 'pid_toggle_service':
+                if not isinstance(param.value, str) or not param.value.strip():
+                    return SetParametersResult(
+                        successful=False,
+                        reason="pid_toggle_service must be a non-empty string."
+                    )
+
+            elif param.name == 'pid_parameter_service':
+                if not isinstance(param.value, str) or not param.value.strip():
+                    return SetParametersResult(
+                        successful=False,
+                        reason="pid_parameter_service must be a non-empty string."
+                    )
+
         # Validate green and yellow velocity scales
         if not (0.0 < new_green_scale <= 1.0):
             return SetParametersResult(
@@ -328,6 +348,14 @@ class TrafficLightFSM(Node):
             elif param.name == 'yellow_velocity_scale':
                 self.yellow_velocity_scale = new_yellow_scale
                 self.get_logger().info(f"yellow_velocity_scale updated: {self.yellow_velocity_scale}.")
+
+            elif param.name == 'pid_toggle_service':
+                self.pid_toggle_service = param.value
+                self.get_logger().info(f"pid_toggle_service updated: {self.pid_toggle_service}.")
+
+            elif param.name == 'pid_parameter_service':
+                self.pid_parameter_service = param.value
+                self.get_logger().info(f"pid_parameter_service updated: {self.pid_parameter_service}.")
 
         return SetParametersResult(successful=True)
     

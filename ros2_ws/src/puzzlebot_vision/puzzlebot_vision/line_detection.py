@@ -20,18 +20,18 @@ class LineDectection(Node):
 
         # Declare parameters
         self.declare_parameter('update_rate', 30.0)
-        self.declare_parameter('target_width', 640)
+        self.declare_parameter('target_width', 640)      # pixels
         self.declare_parameter('target_height', 480)
         
         # Bird's eye view perspective transformation points
         # These should be calibrated for your specific camera setup
-        self.declare_parameter('perspective_tl_x', 250)  # Top-left
+        self.declare_parameter('perspective_tl_x', 250)  # Top-left (pixels)
         self.declare_parameter('perspective_tl_y', 400)
-        self.declare_parameter('perspective_bl_x', 250)  # Bottom-left
+        self.declare_parameter('perspective_bl_x', 250)  # Bottom-left (pixels)
         self.declare_parameter('perspective_bl_y', 470)
-        self.declare_parameter('perspective_tr_x', 390)  # Top-right
+        self.declare_parameter('perspective_tr_x', 390)  # Top-right (pixels)
         self.declare_parameter('perspective_tr_y', 400)
-        self.declare_parameter('perspective_br_x', 390)  # Bottom-right
+        self.declare_parameter('perspective_br_x', 390)  # Bottom-right (pixels)
         self.declare_parameter('perspective_br_y', 470)
 
         # Gaussian blur parameters
@@ -148,7 +148,7 @@ class LineDectection(Node):
         self.perspective_matrix = cv2.getPerspectiveTransform(pts1, pts2)
         self.inverse_perspective_matrix = cv2.getPerspectiveTransform(pts2, pts1)
         
-        self.get_logger().info(f"Perspective transformation updated with points: TL{tl}, BL{bl}, TR{tr}, BR{br}")
+        self.get_logger().info(f"Perspective transformation updated with points: TL{tl}, BL{bl}, TR{tr}, BR{br}.")
 
     def calculate_lane_centroid(self, mask):
         """
@@ -337,7 +337,7 @@ class LineDectection(Node):
                 self.update_rate = float(param.value)
                 self.timer.cancel()
                 self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz")
+                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name in ('target_width', 'target_height'):
                 if not isinstance(param.value, int) or param.value <= 0:
@@ -347,7 +347,7 @@ class LineDectection(Node):
                     )
                 setattr(self, param.name, param.value)
                 perspective_changed = True
-                self.get_logger().info(f"{param.name} updated: {param.value}")
+                self.get_logger().info(f"{param.name} updated: {param.value} pixels.")
 
             elif param.name.startswith('perspective_'):
                 if not isinstance(param.value, int):
@@ -360,17 +360,17 @@ class LineDectection(Node):
                     if param.value < 0 or param.value >= self.target_width:
                         return SetParametersResult(
                             successful=False,
-                            reason=f"{param.name} must be between 0 and {self.target_width-1}."
+                            reason=f"{param.name} must be between 0 and {self.target_width-1} pixels."
                         )
                 elif param.name.endswith('_y'):
                     if param.value < 0 or param.value >= self.target_height:
                         return SetParametersResult(
                             successful=False,
-                            reason=f"{param.name} must be between 0 and {self.target_height-1}."
+                            reason=f"{param.name} must be between 0 and {self.target_height-1} pixels."
                         )
                 setattr(self, param.name, param.value)
                 perspective_changed = True
-                self.get_logger().info(f"{param.name} updated: {param.value}")
+                self.get_logger().info(f"{param.name} updated: {param.value}.")
 
             elif param.name in ('gaussian_kernel_size', 'morph_kernel_size'):
                 if not isinstance(param.value, int) or param.value <= 0:
@@ -383,7 +383,7 @@ class LineDectection(Node):
                 if kernel_size % 2 == 0:
                     kernel_size += 1
                 setattr(self, param.name, kernel_size)
-                self.get_logger().info(f"{param.name} updated: {kernel_size} (adjusted from {param.value})")
+                self.get_logger().info(f"{param.name} updated: {kernel_size} (adjusted from {param.value}).")
 
             elif param.name in ('gaussian_sigma', 'morph_erode_iterations', 'morph_dilate_iterations'):
                 if not isinstance(param.value, int) or param.value < 0:
@@ -392,7 +392,7 @@ class LineDectection(Node):
                         reason=f"{param.name} must be a non-negative integer."
                     )
                 setattr(self, param.name, param.value)
-                self.get_logger().info(f"{param.name} updated: {param.value}")
+                self.get_logger().info(f"{param.name} updated: {param.value}.")
 
             elif param.name == 'grayscale_threshold':
                 if not isinstance(param.value, int) or param.value < 0 or param.value > 255:
@@ -401,7 +401,7 @@ class LineDectection(Node):
                         reason="grayscale_threshold must be between 0 and 255."
                     )
                 self.grayscale_threshold = param.value
-                self.get_logger().info(f"grayscale_threshold updated: {self.grayscale_threshold}")
+                self.get_logger().info(f"grayscale_threshold updated: {self.grayscale_threshold}.")
 
             elif param.name in ('min_contour_area', 'max_contour_area'):
                 if not isinstance(param.value, int) or param.value <= 0:
@@ -410,7 +410,7 @@ class LineDectection(Node):
                         reason=f"{param.name} must be a positive integer."
                     )
                 setattr(self, param.name, param.value)
-                self.get_logger().info(f"{param.name} updated: {param.value}")
+                self.get_logger().info(f"{param.name} updated: {param.value}.")
 
             elif param.name == 'filter_alpha':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0 or param.value > 1.0:
@@ -419,7 +419,7 @@ class LineDectection(Node):
                         reason="filter_alpha must be between 0.0 and 1.0."
                     )
                 self.filter_alpha = float(param.value)
-                self.get_logger().info(f"filter_alpha updated: {self.filter_alpha}")
+                self.get_logger().info(f"filter_alpha updated: {self.filter_alpha}.")
 
         # Update perspective matrices if any perspective parameters changed
         if perspective_changed:
