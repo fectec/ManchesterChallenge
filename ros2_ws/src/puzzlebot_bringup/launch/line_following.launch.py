@@ -26,10 +26,23 @@ def generate_launch_description():
         parameters=[shared_param_file]
     )
 
+    traffic_light_fsm_node = Node(
+        package='puzzlebot_behavior',
+        executable='traffic_light_fsm',
+        name='traffic_light_fsm',
+        parameters=[shared_param_file]
+    )
 
+    color_blob_detection_node = Node(
+        package='puzzlebot_vision',
+        executable='color_blob_detection',
+        name='color_blob_detection',
+        parameters=[shared_param_file]
+    )
 
     return LaunchDescription([
-
+        traffic_light_fsm_node,
+        color_blob_detection_node,
         line_detection_node,
         line_follow_controller_node
     ])
