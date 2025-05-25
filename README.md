@@ -323,7 +323,7 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
 ```
 
 <p align="justify">
-After building the <code>motor_control_real</code> package, launch the full system using the following command:
+After building the <code>motor_control_real</code> package, launch the full system using the command below:
 </p>
 
 ```bash
@@ -434,7 +434,7 @@ This will also launch a Gazebo simulation acting as a digital twin. It subscribe
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="400"/>
+  <img src="https://github.com/user-attachments/assets/2c3a0372-687b-4801-b7a0-92534c67aa9c" alt="Joystick Teleoperation Demo" width="600"/>
 </p>
 
 <p align="justify">
@@ -444,13 +444,14 @@ In the default control scheme, the left joystick controls linear velocity, and t
 ## Second Stage – Puzzlebot Control (Intelligent Robotics Implementation Course)
 
 <p align="justify">
-As mentioned before, on the hackerboard configuration page, under <strong>Motor-Encoder Settings</strong>, select <strong>Robot Velocities Control Mode</strong> and click Save.
+On the hackerboard configuration page, under <strong>Motor-Encoder Settings</strong>, select <strong>Robot Velocities Control Mode</strong> and click Save.
 </p>
 
-### Point-to-Point Open Loop Controller
+### Point-to-Point Open-Loop Controller
 
 <p align="justify">
 A basic open-loop controller was implemented to command the Puzzlebot to move between predefined waypoints. The controller publishes linear and angular velocities directly for specific durations.
+</p>
 
 <p align="justify">
 You can configure a path in <code>puzzlebot_control/config/open_loop_point_controller_config.yaml</code>. Each waypoint should define its <code>x</code> and <code>y</code> coordinates and either a target duration or a pair of speed commands. Two modes are available:
@@ -466,8 +467,27 @@ You can configure a path in <code>puzzlebot_control/config/open_loop_point_contr
 </ul>
 
 <p align="justify">
-In both modes, it is necessary to specify <code>min_linear_speed</code>, <code>max_linear_speed</code>, <code>min_angular_speed</code>, <code>max_angular_speed</code>, and a <code>drift_margin</code>. The drift margin substracts an extra quantity to each command to improve robustness against drift.
+In both modes, it is necessary to specify <code>min_linear_speed</code>, <code>max_linear_speed</code>, <code>min_angular_speed</code>, <code>max_angular_speed</code>, and a <code>drift_margin</code>. The drift margin subtracts an extra quantity an extra quantity to each command to improve robustness against drift.
 </p>
+
+<p align="justify">
+This system is composed of two nodes:
+</p>
+
+<p align="justify">
+- <code><strong>puzzlebot_control/open_loop_path_generator</strong></code>: processes waypoint configurations and generates motion commands, publishing <code>OpenLoopPose</code> messages containing linear velocity, angular velocity, and execution time for each movement phase.<br>
+- <code><strong>puzzlebot_control/open_loop_point_controller</strong></code>: subscribes to <code>OpenLoopPose</code> commands and executes them using a finite state machine, publishing <code>Twist</code> messages to the <code>cmd_vel</code> topic to drive the robot.
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/29d18695-e307-49f9-bfb0-5fae29035127" alt="rqt_graph of the point-to-point open-loop control system" width="600"/>
+</p>
+
+To execute the controller:
+
+```bash
+ros2 launch puzzlebot_control open_loop_point_controller.launch.py
+```
 
 <p><strong>Example – Time-based Mode</strong></p>
 
@@ -493,7 +513,7 @@ open_loop_point_controller:
 </code></pre>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dd89c229-a619-41d2-bc90-199b474b8bc5" alt="Point-to-Point Open Loop Control Time-based Mode Demo" width="400"/>
+  <img src="https://github.com/user-attachments/assets/dd89c229-a619-41d2-bc90-199b474b8bc5" alt="Point-to-Point Open Loop Control Time-based Mode Demo" width="600"/>
 </p>
 
 <p><strong>Example – Speed-based Mode</strong></p>
@@ -520,5 +540,119 @@ open_loop_point_controller:
 </code></pre>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dd801868-afb5-45e8-ad59-7ed309a69d7d" alt="Point-to-Point Open Loop Control Speed-based Mode Demo" width="400"/>
+  <img src="https://github.com/user-attachments/assets/dd801868-afb5-45e8-ad59-7ed309a69d7d" alt="Point-to-Point Open Loop Control Speed-based Mode Demo" width="600"/>
 </p>
+
+<p align="justify">
+
+### Point-to-Point PID Controller
+
+<p align="justify">
+A PID controller was developed to improve accuracy using feedback from the robot's odometry. 
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/04bee444-6aa4-4b1b-a97d-b6062694aa05" alt="Point-to-Point ṔID Control Demo" width="600"/>
+</p>
+
+<p align="justify">
+The system consists of three nodes:
+</p>
+
+<p align="justify">
+- <code><strong>puzzlebot_control/odometry_localization</strong></code>: estimates the robot's pose (x, y, theta) using dead reckoning from wheel encoder data, publishing odometry messages and TF transforms.<br>
+- <code><strong>puzzlebot_control/pid_path_generator</strong></code>: serves waypoints through a service interface, providing sequential target positions to the controller upon request.<br>
+- <code><strong>puzzlebot_control/pid_point_controller</strong></code>: implements PID control logic to compute velocity commands, minimizing position and heading errors between current pose and target waypoint.
+</p>
+
+<p align="justify">
+You can configure the system parameters in <code>puzzlebot_control/config/pid_point_controller_config.yaml</code>.
+</p>
+
+<p align="justify">
+The configuration includes robot physical parameters (wheel base and radius), PID controller gains for both linear and angular velocities, position and heading tolerances for waypoint completion, and velocity limits. Waypoints are defined as a JSON array of x and y coordinates, with distance constraints between consecutive points.
+</p>
+
+To launch the controller:
+
+```bash
+ros2 launch puzzlebot_control pid_point_controller.launch.py
+```
+
+### Multiple Point Navigation with Image Identification
+
+<p align="justify">
+A decision-making layer was integrated into the previously developed point-to-point PID navigation algorithm to detect and respond to traffic light colors.
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/de52aecf-1987-4300-82f2-15980e17aa91" alt="Traffic Light Navigation System Demo" width="600"/>
+</p>
+
+<p align="justify">
+The expected behavior follows standard traffic light conventions:
+</p>
+
+<ul>
+  <li><strong>Green:</strong> Continue normal path execution at full speed.</li>
+  <li><strong>Yellow:</strong> Reduce speed significantly until transitioning to red.</li>
+  <li><strong>Red:</strong> Stop and remain stationary until a green light is detected.</li>
+  <li><strong>No detection:</strong> Stop as a safety measure until valid color detection resumes.</li>
+</ul>
+
+<p align="justify">
+Visual decision-making capabilities are implemented through two additional nodes that work alongside the existing PID navigation system:
+</p>
+
+<p align="justify">
+- <code><strong>puzzlebot_vision/color_blob_detection</strong></code>: processes camera images using HSV color filtering and morphological operations to identify red, green, and yellow traffic light blobs, publishing <code>ColorBlobDetection</code> messages containing the largest detected blob's color.<br>
+<p align="justify">
+- <code><strong>puzzlebot_behavior/traffic_light_fsm</strong></code>: contains a finite state machine that uses <code>ColorBlobDetection</code> messages to manage traffic light transitions and executes their corresponding actions. For green, it resumes the PID controller and scales its linear velocity control output to 100%, whereas for yellow, it scales the signal to <100% for slower movement; for red and no detection, it stops the PID controller entirely. All of these actions are executed through service calls.
+</p>
+
+<p align="justify">
+You can configure the system parameters in <code>puzzlebot_bringup/config/traffic_light_fsm_config.yaml</code>.</p>
+
+<p align="justify">
+The configuration includes HSV color ranges, image processing and blob detection parameters for traffic light identification, velocity scaling factors for green and yellow states, plus all the standard PID controller and odometry parameters from the previous system.
+</p>
+
+To run the system:
+
+```bash
+ros2 launch puzzlebot_bringup traffic_light_fsm.launch.py
+```
+
+### Line Following
+
+<p align="justify">
+A line following layer was added to the previously developed traffic light decision solution.
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/436a6b74-e306-4932-ae79-7fea50fa11d4" alt="Line Following Demo" width="600"/>
+</p>
+
+<p align="justify">
+Path tracking is accomplished through two additional nodes that work alongside the existing image identification system:
+</p>
+
+<p align="justify">
+- <code><strong>puzzlebot_vision/line_detection</strong></code>: processes camera images using perspective transformation and image filtering to detect lane markings, then calculates the lane's centroid position and outputs normalized lateral error indicating how far the robot deviates from the lane center.<br>
+<p align="justify">
+- <code><strong>puzzlebot_control/line_follow_controller</strong></code>: receives lateral error measurements from the detection node and uses PID control to steer the robot back toward the lane center, maintaining constant forward speed.
+</p>
+
+<p align="justify">
+You can configure the system parameters in <code>puzzlebot_bringup/config/line_following_config.yaml</code>. 
+</p>
+
+<p align="justify">
+The configuration includes perspective transformation points for bird's eye view mapping, image processing values for lane detection, constant linear velocity for lane tracking, PID gains for lateral control, timeout value for stopping operation when lane is temporarily lost, steering deadband threshold (a tolerance to reduce small steering oscillations), plus all parameters from the previous system.
+</p>
+
+To run the system:
+
+```bash
+ros2 launch puzzlebot_bringup line_following.launch.py
+```
