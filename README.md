@@ -606,7 +606,6 @@ Visual decision-making capabilities are implemented through two additional nodes
 
 <p align="justify">
 - <code><strong>puzzlebot_vision/color_blob_detection</strong></code>: processes camera images using HSV color filtering and morphological operations to identify red, green, and yellow traffic light blobs, publishing <code>ColorBlobDetection</code> messages containing the largest detected blob's color.<br>
-<p align="justify">
 - <code><strong>puzzlebot_behavior/traffic_light_fsm</strong></code>: contains a finite state machine that uses <code>ColorBlobDetection</code> messages to manage traffic light transitions and executes their corresponding actions. For green, it resumes the PID controller and scales its linear velocity control output to 100%, whereas for yellow, it scales the signal to <100% for slower movement; for red and no detection, it stops the PID controller entirely. All of these actions are executed through service calls.
 </p>
 
@@ -639,7 +638,6 @@ Path tracking is accomplished through two additional nodes that work alongside t
 
 <p align="justify">
 - <code><strong>puzzlebot_vision/line_detection</strong></code>: processes camera images using perspective transformation and image filtering to detect lane markings, then calculates the lane's centroid position and outputs normalized lateral error indicating how far the robot deviates from the lane center.<br>
-<p align="justify">
 - <code><strong>puzzlebot_control/line_follow_controller</strong></code>: receives lateral error measurements from the detection node and uses PID control to steer the robot back toward the lane center, maintaining constant forward speed.
 </p>
 
