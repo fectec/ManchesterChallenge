@@ -11,7 +11,7 @@ from rclpy import qos
 from rclpy.parameter import Parameter
 from rcl_interfaces.msg import SetParametersResult
 
-from sensor_msgs.msg import Image,CompressedImage
+from sensor_msgs.msg import Image, CompressedImage
 from std_msgs.msg import Float32
 
 class LineDectection(Node):
@@ -221,7 +221,6 @@ class LineDectection(Node):
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
             self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            #self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}")
     
