@@ -14,12 +14,15 @@
   <build_depend>puzzlebot_vision</build_depend>
   <build_depend>puzzlebot_control</build_depend>
   <build_depend>puzzlebot_behavior</build_depend>
+  <build_depend>yolobot_recognition</build_depend>
+
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>puzzlebot_vision</exec_depend>
   <exec_depend>puzzlebot_control</exec_depend>
   <exec_depend>puzzlebot_behavior</exec_depend>
+  <exec_depend>yolobot_recognition</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
