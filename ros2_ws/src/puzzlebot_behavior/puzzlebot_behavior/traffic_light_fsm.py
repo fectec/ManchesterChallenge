@@ -33,7 +33,7 @@ class TrafficLightFSM(Node):
         super().__init__('traffic_light_fsm')
 
         # Declare parameters
-        self.declare_parameter('update_rate', 50.0)             # Hz
+        self.declare_parameter('update_rate', 30.0)             # Hz
         self.declare_parameter('color_detection_timeout', 0.5)  # s
         self.declare_parameter('green_velocity_scale', 1.0)     
         self.declare_parameter('yellow_velocity_scale', 0.6)    

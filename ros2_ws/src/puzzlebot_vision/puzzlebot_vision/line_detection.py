@@ -12,7 +12,7 @@ from rclpy.parameter import Parameter
 from rcl_interfaces.msg import SetParametersResult
 
 from sensor_msgs.msg import Image, CompressedImage
-from std_msgs.msg import Float32
+from std_msgs.msg import Bool, Float32
 
 class LineDectection(Node):
     def __init__(self):
@@ -50,6 +50,10 @@ class LineDectection(Node):
         
         # Filtering parameters
         self.declare_parameter('filter_alpha', 0.1)
+
+        # Line continuity detection parameters
+        self.declare_parameter('min_line_continuity_area', 15000) 
+        self.declare_parameter('min_line_height', 100)  
         
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
@@ -75,6 +79,8 @@ class LineDectection(Node):
         self.min_contour_area = self.get_parameter('min_contour_area').value
         self.max_contour_area = self.get_parameter('max_contour_area').value
         self.filter_alpha = self.get_parameter('filter_alpha').value
+        self.min_line_continuity_area = self.get_parameter('min_line_continuity_area').value
+        self.min_line_height = self.get_parameter('min_line_height').value
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
@@ -104,6 +110,8 @@ class LineDectection(Node):
             Parameter('min_contour_area',           Parameter.Type.INTEGER, self.min_contour_area),
             Parameter('max_contour_area',           Parameter.Type.INTEGER, self.max_contour_area),
             Parameter('filter_alpha',               Parameter.Type.DOUBLE,  self.filter_alpha),
+            Parameter('min_line_continuity_area',   Parameter.Type.INTEGER, self.min_line_continuity_area),
+            Parameter('min_line_height',            Parameter.Type.INTEGER, self.min_line_height),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -124,7 +132,8 @@ class LineDectection(Node):
         self.thresholded_pub = self.create_publisher(Image, 'thresholded', 10)
         self.detected_lanes_pub = self.create_publisher(Image, 'detected_lanes', 10)
         self.centroid_error_pub = self.create_publisher(Float32, 'centroid_error', 10)
-        
+        self.line_detected_pub = self.create_publisher(Bool, 'line_detected', 10)
+
         # Subscriber
         self.subscription = self.create_subscription(
             CompressedImage, 'image_raw/compressed', self.image_callback, qos.qos_profile_sensor_data
@@ -153,20 +162,34 @@ class LineDectection(Node):
     def calculate_lane_centroid(self, mask):
         """
         Calculate the centroid of lane contours for IBVS control
-        Returns: (centroid_x, centroid_y, lane_angle, lane_width)
+        Returns: (centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line)
         """
         # Find all contours in the binary mask
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         if not contours:
-            return None, None, None, None
+            return None, None, None, None, False
         
         # Filter contours by area to remove noise
         valid_contours = [cnt for cnt in contours 
                          if self.min_contour_area < cv2.contourArea(cnt) < self.max_contour_area]
         
         if not valid_contours:
-            return None, None, None, None
+            return None, None, None, None, False
+        
+        # Check for continuous line
+        total_valid_area = sum(cv2.contourArea(cnt) for cnt in valid_contours)
+        max_contour_height = 0
+        
+        # Check each contour's vertical extent
+        for contour in valid_contours:
+            _, y, _, h = cv2.boundingRect(contour)
+            if h > max_contour_height:
+                max_contour_height = h
+        
+        # Determine if we have a continuous line
+        is_continuous_line = (total_valid_area >= self.min_line_continuity_area and 
+                             max_contour_height >= self.min_line_height)
         
         # Calculate moments for all valid contours combined
         total_area = 0
@@ -184,7 +207,7 @@ class LineDectection(Node):
                 contour_data.append((contour, area, cx, cy))
         
         if not contour_data:
-            return None, None, None, None
+            return None, None, None, None, is_continuous_line
         
         # Sort by area and take the largest contours
         contour_data.sort(key=lambda x: x[1], reverse=True)
@@ -199,7 +222,7 @@ class LineDectection(Node):
             centroid_x = int(weighted_cx / total_area)
             centroid_y = int(weighted_cy / total_area)
         else:
-            return None, None, None, None
+            return None, None, None, None, is_continuous_line
         
         # Calculate lane angle using the largest contour
         largest_contour = contour_data[0][0]
@@ -215,7 +238,7 @@ class LineDectection(Node):
         else:
             lane_width = 0
         
-        return centroid_x, centroid_y, lane_angle, lane_width
+        return centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line
 
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
@@ -254,7 +277,12 @@ class LineDectection(Node):
         self.thresholded_pub.publish(thresholded_msg)
         
         # Calculate lane centroid and properties
-        centroid_x, centroid_y, lane_angle, lane_width = self.calculate_lane_centroid(mask)
+        centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line = self.calculate_lane_centroid(mask)
+        
+        # Publish line detected status
+        line_detected_msg = Bool()
+        line_detected_msg.data = is_continuous_line
+        self.line_detected_pub.publish(line_detected_msg)
         
         # Create visualization
         result_frame = transformed_frame.copy()
@@ -299,13 +327,17 @@ class LineDectection(Node):
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             cv2.putText(result_frame, f"Width: {lane_width}", (10, 120), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(result_frame, f"Continuous: {is_continuous_line}", (10, 150), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}")
+            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}, Continuous Line: {is_continuous_line}")
             
         else:
             cv2.putText(result_frame, "No lanes detected", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            self.get_logger().debug("No lanes detected")
+            cv2.putText(result_frame, f"Continuous: {is_continuous_line}", (50, 80), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            self.get_logger().debug(f"No lanes detected, Continuous Line: {is_continuous_line}")
 
         # Draw contours on the result for visualization
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -403,7 +435,7 @@ class LineDectection(Node):
                 self.grayscale_threshold = param.value
                 self.get_logger().info(f"grayscale_threshold updated: {self.grayscale_threshold}.")
 
-            elif param.name in ('min_contour_area', 'max_contour_area'):
+            elif param.name in ('min_contour_area', 'max_contour_area', 'min_line_continuity_area', 'min_line_height'):
                 if not isinstance(param.value, int) or param.value <= 0:
                     return SetParametersResult(
                         successful=False,

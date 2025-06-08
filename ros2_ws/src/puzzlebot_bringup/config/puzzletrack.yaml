@@ -1,7 +1,7 @@
 yolov8_recognition:
   ros__parameters:
     model_name: 'puzzlebot_traffic_signs.pt'
-    confidence_threshold': 0.5
+    confidence_threshold': 0.3
     update_rate: 10.0
 
 line_follow_controller:
@@ -38,15 +38,28 @@ line_detection:
     min_contour_area: 300
     max_contour_area: 5000000
     filter_alpha: 0.1
+    min_line_continuity_area: 15000
+    min_line_height: 100
 
-traffic_light_fsm:
+traffic_fsm:
   ros__parameters:
     update_rate: 30.0
-    color_detection_timeout: 100.0
-    green_velocity_scale: 1.0
-    yellow_velocity_scale: 0.6
+    detection_timeout: 0.8
+    full_speed_scale: 1.0
+    mid_speed_scale: 0.6
     pid_toggle_service: 'line_pid/pid_toggle'
     pid_parameter_service: 'line_follow_controller/set_parameters'
+    stop_sign_min_area: 0.1
+    intersection_linear_vel: 0.2
+    intersection_angular_vel: 0.5
+    image_width: 640
+    image_height: 480
+    sign_ahead_class: 'fwd'
+    sign_right_class: 'right'
+    sign_left_class: 'left'
+    sign_roadwork_class: 'triUp'
+    sign_stop_class: 'stop'
+    sign_giveway_class: 'triDwn'
 
 color_blob_detection:
   ros__parameters:

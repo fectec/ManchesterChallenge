@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'traffic_light_fsm = puzzlebot_behavior.traffic_light_fsm:main',
+            'traffic_fsm = puzzlebot_behavior.traffic_fsm:main',
         ],
     },
 )

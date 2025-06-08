@@ -165,9 +165,8 @@ class LineFollowController(Node):
             return
         self.last_time = now_time
         
-        # If controller is disabled, publish zero velocity
+        # If controller is disabled, return
         if not self.controller_enabled:
-            self.cmd_pub.publish(Twist())
             return
         
         # Don't publish anything until we've received image data
