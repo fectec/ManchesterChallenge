@@ -22,6 +22,9 @@ class LineDectection(Node):
         self.declare_parameter('update_rate', 30.0)
         self.declare_parameter('target_width', 640)      # pixels
         self.declare_parameter('target_height', 480)
+
+         # Input topic selection
+        self.declare_parameter('use_compressed', False)
         
         # Bird's eye view perspective transformation points
         # These should be calibrated for your specific camera setup
@@ -82,6 +85,9 @@ class LineDectection(Node):
         self.min_line_continuity_area = self.get_parameter('min_line_continuity_area').value
         self.min_line_height = self.get_parameter('min_line_height').value
 
+        self.use_compressed = self.get_parameter('use_compressed').value
+
+
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
 
@@ -135,9 +141,24 @@ class LineDectection(Node):
         self.line_detected_pub = self.create_publisher(Bool, 'line_detected', 10)
 
         # Subscriber
-        self.subscription = self.create_subscription(
-            CompressedImage, 'image_raw/compressed', self.image_callback, qos.qos_profile_sensor_data
-        )
+        # self.subscription = self.create_subscription(
+        #     CompressedImage, 'image_raw/compressed', self.image_callback, qos.qos_profile_sensor_data
+        # )
+
+        if self.use_compressed:
+            self.create_subscription(
+                CompressedImage,
+                f"image_raw/compressed",
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
+        else:
+            self.create_subscription(
+                Image,
+                'image_raw',
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
      
         self.get_logger().info('LineDectection node started.')
 
@@ -243,7 +264,11 @@ class LineDectection(Node):
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            # self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            if self.use_compressed:
+                self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            else:
+                self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}")
     

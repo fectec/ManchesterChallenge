@@ -30,6 +30,9 @@ class ColorBlobDetectionNode(Node):
         self.declare_parameter('update_rate',   100.0)    # Hz
         self.declare_parameter('debug_view',    True)
 
+        # Input topic selection
+        self.declare_parameter('use_compressed', False)
+
         # HSV bounds per color
         self.declare_parameter('hsv_red1_low', [0, 100, 100])
         self.declare_parameter('hsv_red1_high', [10, 255, 255])
@@ -91,6 +94,8 @@ class ColorBlobDetectionNode(Node):
         self.morph_erode_iterations     = self.get_parameter('morph_erode_iterations').value
         self.morph_dilate_iterations    = self.get_parameter('morph_dilate_iterations').value
         
+        self.use_compressed = self.get_parameter('use_compressed').value
+
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
 
@@ -125,6 +130,7 @@ class ColorBlobDetectionNode(Node):
             Parameter('morph_kernel_size',          Parameter.Type.INTEGER_ARRAY,   self.morph_kernel_size),
             Parameter('morph_erode_iterations',     Parameter.Type.INTEGER,         self.morph_erode_iterations),
             Parameter('morph_dilate_iterations',    Parameter.Type.INTEGER,         self.morph_dilate_iterations),
+            Parameter('use_compressed',             Parameter.Type.BOOL,    self.use_compressed),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -142,13 +148,28 @@ class ColorBlobDetectionNode(Node):
             10
         )
         
-        # Raw camera images subscriber
-        self.create_subscription(
-            CompressedImage,
-            'image_raw/compressed',
-            self.image_callback,
-            qos.qos_profile_sensor_data
-        )
+        # Create subscribers based on compression setting
+        # self.create_subscription(
+        #     CompressedImage,
+        #     'image_raw/compressed',
+        #     self.image_callback,
+        #     qos.qos_profile_sensor_data
+        # )
+
+        if self.use_compressed:
+            self.create_subscription(
+                CompressedImage,
+                f"image_raw/compressed",
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
+        else:
+            self.create_subscription(
+                Image,
+                'image_raw',
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
 
         # Define HSV ranges for each color
         self.hsv_ranges = {
@@ -195,8 +216,10 @@ class ColorBlobDetectionNode(Node):
     def image_callback(self, msg: CompressedImage) -> None:
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            #self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            if self.use_compressed:
+                self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            else:
+                self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}.")
             return

@@ -21,14 +21,18 @@ class YoloV8Detection(Node):
         super().__init__('yolov8_detection')
         
         # Declare parameters
-        self.declare_parameter('model_name', 'yolov8n.pt')
+        self.declare_parameter('model_name', 'puzzlebot_traffic_signs.pt')
         self.declare_parameter('confidence_threshold', 0.5)
         self.declare_parameter('update_rate', 10.0)
         
+        # Input topic selection
+        self.declare_parameter('use_compressed', False)
+
         # Retrieve parameters
         self.model_name = self.get_parameter('model_name').value
         self.confidence_threshold = self.get_parameter('confidence_threshold').value
         self.update_rate = self.get_parameter('update_rate').value
+        self.use_compressed = self.get_parameter('use_compressed').value
         
         # Initialize variables
         self.bridge = CvBridge()
@@ -38,7 +42,7 @@ class YoloV8Detection(Node):
         
         # Load YOLO model
         self._load_yolo_model()
-        
+
         # Create timer
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
         
@@ -50,12 +54,27 @@ class YoloV8Detection(Node):
         self.image_pub = self.create_publisher(Image, "/inference_result", 10)
         
         # Subscriber
-        self.subscription = self.create_subscription(
-            CompressedImage,
-            'image_raw/compressed', 
-            self.image_callback, 
-            qos.qos_profile_sensor_data
-        )
+        # self.subscription = self.create_subscription(
+        #     Image,
+        #     'image_raw', 
+        #     self.image_callback, 
+        #     qos.qos_profile_sensor_data
+        # )
+
+        if self.use_compressed:
+            self.create_subscription(
+                CompressedImage,
+                f"image_raw/compressed",
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
+        else:
+            self.create_subscription(
+                Image,
+                'image_raw',
+                self.image_callback,
+                qos.qos_profile_sensor_data
+            )
         
         self.get_logger().info('YoloV8Detection Start.')
 
@@ -78,8 +97,13 @@ class YoloV8Detection(Node):
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            # First decode the compressed image
-            self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # First decode the image
+            # self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+
+            if self.use_compressed:
+                self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            else:
+                self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
             
             # Check if image is grayscale and convert to BGR if needed
             if len(self.image.shape) == 2:  # Grayscale image
