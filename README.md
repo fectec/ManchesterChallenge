@@ -610,7 +610,7 @@ Visual decision-making capabilities are implemented through two additional nodes
 </p>
 
 <p align="justify">
-You can configure the system parameters in <code>puzzlebot_bringup/config/traffic_light_fsm_config.yaml</code>.</p>
+You can configure the system parameters in <code>puzzlebot_bringup/config/traffic_light_pid_point_config.yaml</code>.</p>
 
 <p align="justify">
 The configuration includes HSV color ranges, image processing and blob detection parameters for traffic light identification, velocity scaling factors for green and yellow states, plus all the standard PID controller and odometry parameters from the previous system.
@@ -619,7 +619,7 @@ The configuration includes HSV color ranges, image processing and blob detection
 To run the system:
 
 ```bash
-ros2 launch puzzlebot_bringup traffic_light_fsm.launch.py
+ros2 launch puzzlebot_bringup traffic_light_pid_point.launch.py
 ```
 
 ### Line Following
@@ -642,7 +642,7 @@ Path tracking is accomplished through two additional nodes that work alongside t
 </p>
 
 <p align="justify">
-You can configure the system parameters in <code>puzzlebot_bringup/config/line_following_config.yaml</code>. 
+You can configure the system parameters in <code>puzzlebot_bringup/config/traffic_light_line_following_config.yaml</code>. 
 </p>
 
 <p align="justify">
@@ -652,5 +652,5 @@ The configuration includes perspective transformation points for bird's eye view
 To run the system:
 
 ```bash
-ros2 launch puzzlebot_bringup line_following.launch.py
+ros2 launch puzzlebot_bringup traffic_light_line_following.launch.py
 ```
