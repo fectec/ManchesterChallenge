@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import math
-import time
 import sys
 
 import rclpy
@@ -29,7 +28,10 @@ class PIDPointController(Node):
       - odom (nav_msgs/Odometry): Current robot pose and orientation
     
     Service Clients:
-      - point_pid/next_pid_waypoint (custom_interfaces/srv/NextPIDWaypoint): Requests the next waypoint
+      - pid_point_controller/next_pid_waypoint (custom_interfaces/srv/NextPIDWaypoint): Requests the next waypoint
+    
+    Service Servers:
+      - pid_point_controller/controller_on (std_srvs/SetBool): Enable/disable controller output
     
     Publishes to:
       - cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
@@ -48,45 +50,55 @@ class PIDPointController(Node):
 
     The robot stops when both the absolute distance and angular errors are below the tolerances.
 
-    This node also includes a service (point_pid/pid_toggle) that can force the controller to publish a zero Twist.
-    In addition, if a new waypoint is received (via point_pid/waypoint), the controller automatically resumes.
+    This node includes a service (pid_point_controller/controller_on) that can enable/disable the controller output.
+    When disabled, the controller publishes zero Twist commands.
     """
 
     def __init__(self):
         super().__init__('pid_point_controller')
         
         # Declare parameters
-        self.declare_parameter('update_rate',         100.0)        # Hz
-        self.declare_parameter('Kp_V',                0.1)      
+        self.declare_parameter('update_rate',         30.0)        # Hz
+
+        self.declare_parameter('Kp_V',                0.15)      
         self.declare_parameter('Ki_V',                0.0)
         self.declare_parameter('Kd_V',                0.0)
-        self.declare_parameter('Kp_Omega',            0.1)
+
+        self.declare_parameter('Kp_Omega',            0.09)
         self.declare_parameter('Ki_Omega',            0.0)
         self.declare_parameter('Kd_Omega',            0.0)
+
         self.declare_parameter('goal_tolerance',      0.08)         # m
-        self.declare_parameter('heading_tolerance',   0.08)         # m
+        self.declare_parameter('heading_tolerance',   0.09)         # m
+
         self.declare_parameter('min_linear_speed',    0.1)          # m/s
         self.declare_parameter('max_linear_speed',    0.17)         # m/s
-        self.declare_parameter('min_angular_speed',  -1.0)          # rad/s
-        self.declare_parameter('max_angular_speed',    1.0)         # rad/s
-        self.declare_parameter('auto_request_next',   True)
+
+        self.declare_parameter('min_angular_speed',  -0.15)         # rad/s
+        self.declare_parameter('max_angular_speed',    0.15)        # rad/s
+
         self.declare_parameter('velocity_scale_factor', 1.0)
     
         # Retrieve parameters
         self.update_rate                = self.get_parameter('update_rate').value
+
         self.Kp_V                       = self.get_parameter('Kp_V').value
         self.Ki_V                       = self.get_parameter('Ki_V').value
         self.Kd_V                       = self.get_parameter('Kd_V').value
+
         self.Kp_Omega                   = self.get_parameter('Kp_Omega').value
         self.Ki_Omega                   = self.get_parameter('Ki_Omega').value
         self.Kd_Omega                   = self.get_parameter('Kd_Omega').value
+
         self.goal_tolerance             = self.get_parameter('goal_tolerance').value
         self.heading_tolerance          = self.get_parameter('heading_tolerance').value
+
         self.min_linear_speed           = self.get_parameter('min_linear_speed').value
         self.max_linear_speed           = self.get_parameter('max_linear_speed').value
+        
         self.min_angular_speed          = self.get_parameter('min_angular_speed').value
         self.max_angular_speed          = self.get_parameter('max_angular_speed').value
-        self.auto_request_next          = self.get_parameter('auto_request_next').value
+
         self.velocity_scale_factor      = self.get_parameter('velocity_scale_factor').value
 
         # Timer for the control loop
@@ -110,7 +122,6 @@ class PIDPointController(Node):
             Parameter('max_linear_speed',           Parameter.Type.DOUBLE, self.max_linear_speed),
             Parameter('min_angular_speed',          Parameter.Type.DOUBLE, self.min_angular_speed),
             Parameter('max_angular_speed',          Parameter.Type.DOUBLE, self.max_angular_speed),
-            Parameter('auto_request_next',          Parameter.Type.BOOL,   self.auto_request_next),
             Parameter('velocity_scale_factor',      Parameter.Type.DOUBLE, self.velocity_scale_factor),
 
         ]
@@ -125,19 +136,13 @@ class PIDPointController(Node):
         self.goal_active = False
         self.current_waypoint_id = -1
         self.path_completed = False
-
-        # Time tracking (s)
-        self.now_time = None
-        self.last_time = None
+        self.controller_enabled = True
         
         # PID internals 
         self.integral_e_d = 0.0
         self.integral_e_theta = 0.0
         self.last_signed_e_d = 0.0
         self.last_e_theta = 0.0
-
-        # Limit logging frequency (s)
-        self.last_log_time = 0.0
 
         # Publishers
         self.cmd_pub = self.create_publisher(
@@ -146,10 +151,10 @@ class PIDPointController(Node):
             qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE)
         )
         
-        self.waypoint_pub   = self.create_publisher(Pose2D,  'point_pid/waypoint', 10)
-        self.signed_e_d_pub   = self.create_publisher(Float32, 'point_PID/signed_e_d', 10)
-        self.abs_e_d_pub = self.create_publisher(Float32, 'point_PID/abs_e_d', 10)
-        self.e_theta_pub    = self.create_publisher(Float32, 'point_PID/e_theta', 10)
+        self.waypoint_pub   = self.create_publisher(Pose2D,  'pid_point_controller/waypoint', 10)
+        self.signed_e_d_pub   = self.create_publisher(Float32, 'pid_point_controller/signed_e_d', 10)
+        self.abs_e_d_pub = self.create_publisher(Float32, 'pid_point_controller/abs_e_d', 10)
+        self.e_theta_pub    = self.create_publisher(Float32, 'pid_point_controller/e_theta', 10)
 
         # Subscriber for odometry
         self.create_subscription(
@@ -161,13 +166,12 @@ class PIDPointController(Node):
         
         # Service client for requesting the next waypoint
         self.next_waypoint_client = self.create_client(
-            NextPIDWaypoint, 'point_pid/next_pid_waypoint')
+            NextPIDWaypoint, 'pid_point_controller/next_pid_waypoint')
         while not self.next_waypoint_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('point_pid/next_pid_waypoint service not available, waiting...')
-
-        # Service server to allow external stopping or resuming of PID output
-        self.create_service(SetBool, 'point_pid/pid_toggle', self.pid_toggle_callback)
-        self.pid_stop = False  
+            self.get_logger().info('pid_point_controller/next_pid_waypoint service not available, waiting...')
+            
+        # Service server to enable/disable controller output
+        self.create_service(SetBool, 'pid_point_controller/controller_on', self.controller_on_callback)
 
         # Request the first waypoint
         self.request_next_waypoint(True)
@@ -207,7 +211,7 @@ class PIDPointController(Node):
             self.waypoint.theta = response.goal.theta
             self.waypoint_pub.publish(self.waypoint)
             
-            self.last_time = None
+            # Reset PID state for new waypoint
             self.integral_e_d = 0.0
             self.integral_e_theta = 0.0
             self.last_signed_e_d = 0.0
@@ -226,43 +230,40 @@ class PIDPointController(Node):
         except Exception as e:
             self.get_logger().error(f"Error processing waypoint response: {e}.")
 
-    def pid_toggle_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
-        """Service callback to start or stop the PID controller output."""
-        self.pid_stop = request.data
+    def controller_on_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
+        """Service callback to enable or disable the controller output."""
+        self.controller_enabled = request.data
         response.success = True
-        if self.pid_stop:
-            response.message = "PID controller stopped."
+        
+        if self.controller_enabled:
+            response.message = "Controller enabled."
+            self.get_logger().info("Controller enabled via service.")
         else:
-            response.message = "PID controller resumed."
+            response.message = "Controller disabled."
+            # Reset PID state when disabling
+            self.integral_e_d = 0.0
+            self.integral_e_theta = 0.0
+            self.last_signed_e_d = 0.0
+            self.last_e_theta = 0.0
+            self.get_logger().info("Controller disabled via service.")
+            
         return response
     
     def control_loop(self) -> None:
         """Main control loop running at update_rate; computes and publishes velocity commands."""
+        # Calculate dt based on update rate
+        dt = 1.0 / self.update_rate
+        
+        # If controller is disabled, publish zero command and return
+        if not self.controller_enabled:
+            self.cmd_pub.publish(Twist())
+            self.get_logger().debug("Controller disabled; publishing zero command.", 
+                                  throttle_duration_sec=2.0)
+            return
+        
         # Run PID control only when a goal is active
         if not self.goal_active or self.path_completed:
-            return
-        
-        # Record the current timestamp on the very first control cycle 
-        # so that we have a baseline for computing dt
-        now_time = self.get_clock().now().nanoseconds * 1e-9
-        if self.last_time is None:
-            self.last_time = now_time
-            return
-        
-        # Calculate the elapsed time 
-        # since the last update and return early 
-        # if it’s less than the interval dictated by update_rate,
-        # to enforce a consistent loop frequency
-        dt = now_time - self.last_time
-        if dt < 1.0 / self.update_rate:
-            return
-        self.last_time = now_time
-        
-        # If the PID stop flag is set, publish a zero Twist and return immediately
-        if self.pid_stop:
             self.cmd_pub.publish(Twist())
-            self.get_logger().debug("PID stop flag active; publishing zero command.")
-            self.last_time = now_time
             return
 
         # Compute position error components
@@ -299,9 +300,8 @@ class PIDPointController(Node):
             # Mark the current goal as completed
             self.goal_active = False
             
-            # Request the next waypoint if auto-request is enabled
-            if self.auto_request_next:
-                self.request_next_waypoint(True)
+            # Automatically request the next waypoint
+            self.request_next_waypoint(True)
             
             return
 
@@ -315,10 +315,9 @@ class PIDPointController(Node):
         derivative_e_theta = (e_theta - self.last_e_theta) / dt
         Omega = self.Kp_Omega * e_theta + self.Ki_Omega * self.integral_e_theta + self.Kd_Omega * derivative_e_theta
 
-        # Save errors and time for the next iteration
+        # Save errors for the next iteration
         self.last_signed_e_d = signed_e_d
         self.last_e_theta = e_theta
-        self.last_time = now_time
 
         # Apply nonlinearity handling
         V = self.apply_velocity_constraints(V, self.min_linear_speed, self.max_linear_speed)
@@ -333,13 +332,11 @@ class PIDPointController(Node):
         cmd.angular.z = Omega
         self.cmd_pub.publish(cmd)
 
-        # Debug info
-        current_time = time.time()
-        if current_time - self.last_log_time > 1.0:  # Log once per second at most
-            self.get_logger().info(
-                f"Control -> dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}"
-            )
-            self.last_log_time = current_time
+        # Log control info using ROS 2 throttle
+        self.get_logger().info(
+            f"Control -> dist_err={abs_e_d:.3f}, ang_err={e_theta:.3f}, V={V:.3f}, Omega={Omega:.3f}",
+            throttle_duration_sec=1.0
+        )
 
     def apply_velocity_constraints(self, velocity: float, min_vel: float, max_vel: float) -> float:
         """Clamp the velocity to specified minimum and maximum limits."""
@@ -435,15 +432,6 @@ class PIDPointController(Node):
                     )
                 self.max_angular_speed = float(param.value)
                 self.get_logger().info(f"max_angular_speed updated: {self.max_angular_speed} rad/s.")
-
-            elif param.name == 'auto_request_next':
-                if not isinstance(param.value, bool):
-                    return SetParametersResult(
-                        successful=False,
-                        reason="auto_request_next must be true or false."
-                    )
-                self.auto_request_next = param.value
-                self.get_logger().info(f"auto_request_next updated: {self.auto_request_next}.")
             
             elif param.name == 'velocity_scale_factor':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:

@@ -12,7 +12,8 @@ from rclpy.parameter import Parameter
 from rcl_interfaces.msg import SetParametersResult
 
 from sensor_msgs.msg import Image, CompressedImage
-from std_msgs.msg import Bool, Float32
+from std_msgs.msg import Float32
+from std_srvs.srv import Trigger
 
 class LineDectection(Node):
     def __init__(self):
@@ -21,50 +22,53 @@ class LineDectection(Node):
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
         self.declare_parameter('use_compressed', False)
+
         self.declare_parameter('update_rate', 30.0)
+
         self.declare_parameter('target_width', 640)      # pixels
         self.declare_parameter('target_height', 480)
         
         # Bird's eye view perspective transformation points
         # These should be calibrated for your specific camera setup
-        self.declare_parameter('perspective_tl_x', 250)  # Top-left (pixels)
-        self.declare_parameter('perspective_tl_y', 400)
-        self.declare_parameter('perspective_bl_x', 250)  # Bottom-left (pixels)
-        self.declare_parameter('perspective_bl_y', 470)
-        self.declare_parameter('perspective_tr_x', 390)  # Top-right (pixels)
-        self.declare_parameter('perspective_tr_y', 400)
-        self.declare_parameter('perspective_br_x', 390)  # Bottom-right (pixels)
-        self.declare_parameter('perspective_br_y', 470)
+        self.declare_parameter('perspective_tl_x', 190)  # Top-left (pixels)
+        self.declare_parameter('perspective_tl_y', 350)
+        self.declare_parameter('perspective_bl_x', 190)  # Bottom-left (pixels)
+        self.declare_parameter('perspective_bl_y', 479)
+        self.declare_parameter('perspective_tr_x', 450)  # Top-right (pixels)
+        self.declare_parameter('perspective_tr_y', 350)
+        self.declare_parameter('perspective_br_x', 450)  # Bottom-right (pixels)
+        self.declare_parameter('perspective_br_y', 479)
 
         # Gaussian blur parameters
         self.declare_parameter('gaussian_kernel_size', 5)
         self.declare_parameter('gaussian_sigma', 5)
         
         # Thresholding and morphology parameters
-        self.declare_parameter('grayscale_threshold', 125)
+        self.declare_parameter('grayscale_threshold', 95)
         self.declare_parameter('morph_kernel_size', 3)
-        self.declare_parameter('morph_erode_iterations', 7)
-        self.declare_parameter('morph_dilate_iterations', 7)
+        self.declare_parameter('morph_erode_iterations', 40)
+        self.declare_parameter('morph_dilate_iterations', 90)
         
         # Centroid calculation parameters
-        self.declare_parameter('min_contour_area', 500)
-        self.declare_parameter('max_contour_area', 5000000)
+        self.declare_parameter('min_contour_area', 180)
+        self.declare_parameter('max_contour_area', 50000)
         
         # Filtering parameters
         self.declare_parameter('filter_alpha', 0.1)
 
         # Line continuity detection parameters
-        self.declare_parameter('min_line_continuity_area', 15000) 
+        self.declare_parameter('min_line_continuity_area', 7500) 
         self.declare_parameter('min_line_height', 100)  
         
         # Retrieve parameters
         self.image_topic = self.get_parameter('image_topic').value
         self.use_compressed = self.get_parameter('use_compressed').value
+
         self.update_rate = self.get_parameter('update_rate').value
+
         self.target_width = self.get_parameter('target_width').value
         self.target_height = self.get_parameter('target_height').value
         
-        # Perspective transformation points
         self.perspective_tl_x = self.get_parameter('perspective_tl_x').value
         self.perspective_tl_y = self.get_parameter('perspective_tl_y').value
         self.perspective_bl_x = self.get_parameter('perspective_bl_x').value
@@ -76,21 +80,30 @@ class LineDectection(Node):
         
         self.gaussian_kernel_size = self.get_parameter('gaussian_kernel_size').value
         self.gaussian_sigma = self.get_parameter('gaussian_sigma').value
+
         self.grayscale_threshold = self.get_parameter('grayscale_threshold').value
         self.morph_kernel_size = self.get_parameter('morph_kernel_size').value
         self.morph_erode_iterations = self.get_parameter('morph_erode_iterations').value
         self.morph_dilate_iterations = self.get_parameter('morph_dilate_iterations').value
+
         self.min_contour_area = self.get_parameter('min_contour_area').value
         self.max_contour_area = self.get_parameter('max_contour_area').value
+
         self.filter_alpha = self.get_parameter('filter_alpha').value
+        
         self.min_line_continuity_area = self.get_parameter('min_line_continuity_area').value
         self.min_line_height = self.get_parameter('min_line_height').value
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
 
-        # Register the parameter callback
+        # Register the on‐set‐parameters callback
         self.add_on_set_parameters_callback(self.parameter_callback)
+
+        # Service servers for pause/resume
+        self.create_service(Trigger, 'line_detection/pause_timer', self.pause_timer_callback)
+        self.create_service(Trigger, 'line_detection/resume_timer', self.resume_timer_callback)
+        self.timer_active = True
         
         # Validate initial parameters
         init_params = [
@@ -127,18 +140,27 @@ class LineDectection(Node):
         # State for filtering
         self.last_centroid_error = None
         
+        # Line detection state
+        self.is_line_detected = False
+        
         # Initialize variables
         self.image = None
         self.bridge = CvBridge()
         
-        # Compute perspective transformation matrices (these stay constant unless parameters change)
+        # Compute perspective transformation matrices
         self.update_perspective_matrices()
         
         # Publishers
-        self.thresholded_pub = self.create_publisher(Image, 'thresholded', 10)
-        self.detected_lanes_pub = self.create_publisher(Image, 'detected_lanes', 10)
-        self.centroid_error_pub = self.create_publisher(Float32, 'centroid_error', 10)
-        self.line_detected_pub = self.create_publisher(Bool, 'line_detected', 10)
+        self.thresholded_pub = self.create_publisher(Image, 'line_detection/thresholded', qos.qos_profile_sensor_data)
+        self.detected_line_pub = self.create_publisher(Image, 'line_detection/detected_line', qos.qos_profile_sensor_data)
+        self.centroid_error_pub = self.create_publisher(Float32, 'line_detection/centroid_error', qos.qos_profile_sensor_data)
+
+        # Service server to check if line is detected
+        self.line_status_service = self.create_service(
+            Trigger, 
+            'line_detection/is_line_detected', 
+            self.line_status_callback
+        )
 
         # Create subscribers based on compression setting
         if self.use_compressed:
@@ -156,7 +178,43 @@ class LineDectection(Node):
                 qos.qos_profile_sensor_data
             )
      
-        self.get_logger().info('LineDectection node started.')
+        self.get_logger().info('LineDectection Start.')
+
+    def pause_timer_callback(self, request, response):
+        """Service callback to pause the timer."""
+        if self.timer is not None and self.timer_active:
+            self.timer.cancel()
+            self.timer = None
+            self.timer_active = False
+            self.get_logger().info('Timer paused.')
+            response.success = True
+            response.message = "Timer paused."
+        else:
+            response.success = False
+            response.message = "Timer already paused or not initialized."
+        return response
+
+    def resume_timer_callback(self, request, response):
+        """Service callback to resume the timer."""
+        if self.timer is None and not self.timer_active:
+            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+            self.timer_active = True
+            self.get_logger().info('Timer resumed.')
+            response.success = True
+            response.message = "Timer resumed."
+        else:
+            response.success = False
+            response.message = "Timer is already running."
+        return response
+
+    def line_status_callback(self, request, response):
+        """Service callback to report line detection status."""
+        response.success = self.is_line_detected
+        if self.is_line_detected:
+            response.message = "Line is detected and being tracked."
+        else:
+            response.message = "No line detected."
+        return response
 
     def update_perspective_matrices(self):
         """Update perspective transformation matrices based on current parameters."""
@@ -178,7 +236,7 @@ class LineDectection(Node):
 
     def calculate_lane_centroid(self, mask):
         """
-        Calculate the centroid of lane contours for IBVS control
+        Calculate the centroid of line contours for IBVS control
         Returns: (centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line)
         """
         # Find all contours in the binary mask
@@ -213,7 +271,7 @@ class LineDectection(Node):
         weighted_cx = 0
         weighted_cy = 0
         
-        # Find the largest contours (likely the lane markings)
+        # Find the largest contours (likely the line markings)
         contour_data = []
         for contour in valid_contours:
             area = cv2.contourArea(contour)
@@ -241,14 +299,14 @@ class LineDectection(Node):
         else:
             return None, None, None, None, is_continuous_line
         
-        # Calculate lane angle using the largest contour
+        # Calculate line angle using the largest contour
         largest_contour = contour_data[0][0]
         
-        # Fit a line to estimate lane direction
+        # Fit a line to estimate line direction
         [vx, vy, x, y] = cv2.fitLine(largest_contour, cv2.DIST_L2, 0, 0.01, 0.01)
         lane_angle = float(np.arctan2(vy[0], vx[0]) * 180 / np.pi)  # Convert to degrees
         
-        # Calculate approximate lane width (distance between leftmost and rightmost contours)
+        # Calculate approximate line width (distance between leftmost and rightmost contours)
         if len(contour_data) >= 2:
             x_positions = [data[2] for data in contour_data]  # cx values
             lane_width = max(x_positions) - min(x_positions)
@@ -268,7 +326,7 @@ class LineDectection(Node):
             self.get_logger().error(f"CvBridgeError: {e}")
     
     def timer_callback(self):
-        """Main timer function to process images and detect lanes."""
+        """Main timer function to process images and detect the line."""
         if self.image is None:
             return
 
@@ -296,13 +354,11 @@ class LineDectection(Node):
         thresholded_msg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
         self.thresholded_pub.publish(thresholded_msg)
         
-        # Calculate lane centroid and properties
+        # Calculate line centroid and properties
         centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line = self.calculate_lane_centroid(mask)
         
-        # Publish line detected status
-        line_detected_msg = Bool()
-        line_detected_msg.data = is_continuous_line
-        self.line_detected_pub.publish(line_detected_msg)
+        # Update line detection status
+        self.is_line_detected = is_continuous_line
         
         # Create visualization
         result_frame = transformed_frame.copy()
@@ -327,7 +383,7 @@ class LineDectection(Node):
             # Calculate normalized error for IBVS control (-1.0 to 1.0)
             error_x = centroid_x - image_center_x
             centroid_error = error_x / (self.target_width / 2.0)  # Normalize to [-1, 1]
-            centroid_error = np.clip(centroid_error, -1.0, 1.0)  # Ensure bounds
+            centroid_error = np.clip(centroid_error, -1.0, 1.0)   # Ensure bounds
             
             # Apply filtering to smooth the output
             if self.last_centroid_error is not None:
@@ -347,17 +403,17 @@ class LineDectection(Node):
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             cv2.putText(result_frame, f"Width: {lane_width}", (10, 120), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(result_frame, f"Continuous: {is_continuous_line}", (10, 150), 
+            cv2.putText(result_frame, f"Line Detected: {is_continuous_line}", (10, 150), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}, Continuous Line: {is_continuous_line}")
-            
+            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}, Line Detected: {is_continuous_line}.")     
         else:
-            cv2.putText(result_frame, "No lanes detected", (50, 50), 
+            cv2.putText(result_frame, "No line detected", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.putText(result_frame, f"Continuous: {is_continuous_line}", (50, 80), 
+            cv2.putText(result_frame, f"Line Detected: {is_continuous_line}", (50, 80), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            self.get_logger().debug(f"No lanes detected, Continuous Line: {is_continuous_line}")
+            
+            self.get_logger().debug(f"No line detected, Line Detected: {is_continuous_line}.")
 
         # Draw contours on the result for visualization
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -365,12 +421,12 @@ class LineDectection(Node):
                          if self.min_contour_area < cv2.contourArea(cnt) < self.max_contour_area]
         cv2.drawContours(result_frame, valid_contours, -1, (255, 0, 255), 2)
 
-        # Publish detected lanes visualization
-        detected_lanes_msg = self.bridge.cv2_to_imgmsg(result_frame, encoding='bgr8')
-        self.detected_lanes_pub.publish(detected_lanes_msg)
+        # Publish detected line visualization
+        detected_line_msg = self.bridge.cv2_to_imgmsg(result_frame, encoding='bgr8')
+        self.detected_line_pub.publish(detected_line_msg)
         
-        # Publish centroid error for IBVS control
-        if centroid_error is not None:
+        # Publish centroid error for IBVS control (only when line is detected)
+        if centroid_error is not None and self.is_line_detected:
             centroid_msg = Float32()
             centroid_msg.data = float(centroid_error)
             self.centroid_error_pub.publish(centroid_msg)
@@ -387,7 +443,7 @@ class LineDectection(Node):
                         reason="image_topic must be a non-empty string."
                     )
                 self.image_topic = param.value
-                self.get_logger().info(f"image_topic updated: {self.image_topic}. Note: Restart node to apply topic change.")
+                self.get_logger().info(f"image_topic updated: {self.image_topic}.")
 
             elif param.name == 'use_compressed':
                 if not isinstance(param.value, bool):
@@ -396,7 +452,7 @@ class LineDectection(Node):
                         reason="use_compressed must be a boolean."
                     )
                 self.use_compressed = param.value
-                self.get_logger().info(f"use_compressed updated: {self.use_compressed}. Note: Restart node to apply compression change.")
+                self.get_logger().info(f"use_compressed updated: {self.use_compressed}.")
 
             elif param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -405,8 +461,10 @@ class LineDectection(Node):
                         reason="update_rate must be > 0."
                     )
                 self.update_rate = float(param.value)
-                self.timer.cancel()
-                self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+                # Only cancel timer if it exists and is active
+                if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
+                    self.timer.cancel()
+                    self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name in ('target_width', 'target_height'):

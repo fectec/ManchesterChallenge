@@ -12,6 +12,20 @@ def generate_launch_description():
     pkg_bringup = get_package_share_directory('puzzlebot_bringup')
     shared_param_file = os.path.join(pkg_bringup, 'config', 'puzzletrack.yaml')
 
+    color_blob_detection_node = Node(
+        package='puzzlebot_vision',
+        executable='color_blob_detection',
+        name='color_blob_detection',
+        parameters=[shared_param_file]
+    )
+
+    yolov8_recognition_node = Node(
+        package='yolobot_recognition',
+        executable='yolov8_recognition',
+        name='yolov8_recognition',
+        parameters=[shared_param_file]
+    )
+
     line_detection_node = Node(
         package='puzzlebot_vision',
         executable='line_detection',
@@ -33,24 +47,10 @@ def generate_launch_description():
         parameters=[shared_param_file]
     )
 
-    color_blob_detection_node = Node(
-        package='puzzlebot_vision',
-        executable='color_blob_detection',
-        name='color_blob_detection',
-        parameters=[shared_param_file]
-    )
-
-    yolov8_recognition_node = Node(
-        package='yolobot_recognition',
-        executable='yolov8_recognition',
-        name='yolov8_recognition',
-        parameters=[shared_param_file]
-    )
-
     return LaunchDescription([
-        traffic_fsm_node,
         color_blob_detection_node,
+        yolov8_recognition_node,
         line_detection_node,
         line_follow_controller_node,
-        yolov8_recognition_node
+        traffic_fsm_node
     ])

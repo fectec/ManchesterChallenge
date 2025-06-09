@@ -60,7 +60,7 @@ class PIDPathGenerator(Node):
         # Create a service to provide the next waypoint
         self.create_service(
             NextPIDWaypoint, 
-            'point_pid/next_pid_waypoint', 
+            'pid_point_controller/next_pid_waypoint', 
             self.next_waypoint_callback
         )
         

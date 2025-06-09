@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import math
-import time
 import sys
 
 import rclpy
@@ -30,14 +29,14 @@ class OdometryLocalization(Node):
         super().__init__('odometry_localization')
 
         # Declare parameters
-        self.declare_parameter('update_rate',      200.0)   # Hz
-        self.declare_parameter('integration_rate', 100.0)   # Hz
-        self.declare_parameter('wheel_base',       0.173)   # m
-        self.declare_parameter('wheel_radius',     0.0505)  # m
+        self.declare_parameter('update_rate',      60.0)    # Hz
+
+        self.declare_parameter('wheel_base',       0.19)    # m
+        self.declare_parameter('wheel_radius',     0.051)   # m
 
         # Load parameters
         self.update_rate      = self.get_parameter('update_rate').value
-        self.integration_rate = self.get_parameter('integration_rate').value
+        
         self.wheel_base       = self.get_parameter('wheel_base').value
         self.wheel_radius     = self.get_parameter('wheel_radius').value
 
@@ -50,7 +49,6 @@ class OdometryLocalization(Node):
         # Immediately validate the initial values
         init_params = [
             Parameter('update_rate',      Parameter.Type.DOUBLE, self.update_rate),
-            Parameter('integration_rate', Parameter.Type.DOUBLE, self.integration_rate),
             Parameter('wheel_base',       Parameter.Type.DOUBLE, self.wheel_base),
             Parameter('wheel_radius',     Parameter.Type.DOUBLE, self.wheel_radius),
         ]
@@ -66,12 +64,6 @@ class OdometryLocalization(Node):
         # Wheel angular velocities (rad/s)
         self.omega_r = 0.0
         self.omega_l = 0.0
-
-        # Last timestamp for integration (s)
-        self.last_time = None
-        
-        # Limit logging frequency (s)
-        self.last_log_time = 0.0
 
         # TF broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -109,21 +101,8 @@ class OdometryLocalization(Node):
 
     def update_odometry(self) -> None:
         """Computes and updates robot pose using Euler integration and publishes odometry."""
-        # Get current time
-        now = self.get_clock().now()
-        now_time = now.nanoseconds * 1e-9
-
-        # Initialization on first run
-        if self.last_time is None:
-            self.last_time = now_time
-            return
-
-        # Compute elapsed time since last update (s)
-        # Skip integration if dt is less than integration period
-        dt = now_time - self.last_time
-        if dt < 1.0 / self.integration_rate:
-            return
-        self.last_time = now_time
+        # Calculate dt based on update rate
+        dt = 1.0 / self.update_rate
 
         # Convert wheel angular velocities (rad/s) to linear velocities (m/s)
         v_r = self.wheel_radius * self.omega_r
@@ -137,6 +116,9 @@ class OdometryLocalization(Node):
         self.x += V * math.cos(self.theta) * dt
         self.y += V * math.sin(self.theta) * dt
         self.theta = wrap_to_pi(self.theta + Omega * dt)
+
+        # Get current time for message headers
+        now = self.get_clock().now()
 
         # Prepare the Odometry message
         odom_msg = Odometry()
@@ -169,13 +151,11 @@ class OdometryLocalization(Node):
 
         self.tf_broadcaster.sendTransform(t)   
 
-        # Log the updated pose
-        current_time = time.time()
-        if current_time - self.last_log_time > 1.0:  # Log once per second at most
-            self.get_logger().info(
-                f"Pose -> x: {self.x:.3f}, y: {self.y:.3f}, theta: {self.theta:.3f} rad"
-            )
-            self.last_log_time = current_time
+        # Log the updated pose with ROS 2 throttle
+        self.get_logger().info(
+            f"Pose -> x: {self.x:.3f}, y: {self.y:.3f}, theta: {self.theta:.3f} rad",
+            throttle_duration_sec=1.0
+        )
 
     def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
         """Validates and applies updated node parameters."""
@@ -190,15 +170,6 @@ class OdometryLocalization(Node):
                 self.timer.cancel()
                 self.timer = self.create_timer(1.0 / self.update_rate, self.update_odometry)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
-
-            elif param.name == 'integration_rate':
-                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="integration_rate must be > 0."
-                    )
-                self.integration_rate = float(param.value)
-                self.get_logger().info(f"integration_rate updated: {self.integration_rate} Hz.")
 
             elif param.name == 'wheel_base':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:

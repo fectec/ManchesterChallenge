@@ -15,6 +15,7 @@ from rcl_interfaces.msg import SetParametersResult
 
 from sensor_msgs.msg import Image, CompressedImage
 from yolov8_msgs.msg import InferenceResult, Yolov8Inference
+from std_srvs.srv import Trigger
 
 class YoloV8Detection(Node):
     def __init__(self):
@@ -23,22 +24,27 @@ class YoloV8Detection(Node):
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
         self.declare_parameter('use_compressed', False)
+
         self.declare_parameter('model_name', 'puzzlebot_traffic_signs.pt')
-        self.declare_parameter('confidence_threshold', 0.5)
-        self.declare_parameter('update_rate', 10.0)
+        self.declare_parameter('confidence_threshold', 0.3)
+
+        self.declare_parameter('update_rate', 5.0)
 
         # Retrieve parameters
         self.image_topic = self.get_parameter('image_topic').value
         self.use_compressed = self.get_parameter('use_compressed').value
+
         self.model_name = self.get_parameter('model_name').value
         self.confidence_threshold = self.get_parameter('confidence_threshold').value
+        
         self.update_rate = self.get_parameter('update_rate').value
         
         # Initialize variables
         self.bridge = CvBridge()
         self.image = None
         self.model = None
-        self.timer = None  
+        self.timer = None
+        self.timer_active = True
         
         # Load YOLO model
         self._load_yolo_model()
@@ -48,6 +54,10 @@ class YoloV8Detection(Node):
         
         # Register the parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
+        
+        # Service servers for pause/resume
+        self.create_service(Trigger, 'yolov8_recognition/pause_timer', self.pause_timer_callback)
+        self.create_service(Trigger, 'yolov8_recognition/resume_timer', self.resume_timer_callback)
         
         # Validate initial parameters
         init_params = [
@@ -63,8 +73,8 @@ class YoloV8Detection(Node):
             raise RuntimeError(f"Parameter validation failed: {result.reason}")
         
         # Publishers
-        self.yolov8_pub = self.create_publisher(Yolov8Inference, "/Yolov8_Inference", 10)
-        self.image_pub = self.create_publisher(Image, "/inference_result", 10)
+        self.yolov8_pub = self.create_publisher(Yolov8Inference, "Yolov8_Inference", qos.qos_profile_sensor_data)
+        self.image_pub = self.create_publisher(Image, "inference_result", qos.qos_profile_sensor_data)
         
         # Create subscribers based on compression setting
         if self.use_compressed:
@@ -83,6 +93,33 @@ class YoloV8Detection(Node):
             )
         
         self.get_logger().info('YoloV8Detection Start.')
+
+    def pause_timer_callback(self, request, response):
+        """Service callback to pause the timer."""
+        if self.timer is not None and self.timer_active:
+            self.timer.cancel()
+            self.timer = None
+            self.timer_active = False
+            self.get_logger().info('Timer paused.')
+            response.success = True
+            response.message = "Timer paused."
+        else:
+            response.success = False
+            response.message = "Timer already paused or not initialized."
+        return response
+
+    def resume_timer_callback(self, request, response):
+        """Service callback to resume the timer."""
+        if self.timer is None and not self.timer_active:
+            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+            self.timer_active = True
+            self.get_logger().info('Timer resumed.')
+            response.success = True
+            response.message = "Timer resumed."
+        else:
+            response.success = False
+            response.message = "Timer is already running."
+        return response
 
     def _load_yolo_model(self):
         """Load YOLO model from package share directory."""
@@ -119,6 +156,9 @@ class YoloV8Detection(Node):
 
     def timer_callback(self):
         """Main timer function to process images and detect objects."""
+        if not self.timer_active:
+            return
+            
         if self.image is None or self.model is None:
             return
 
@@ -223,8 +263,8 @@ class YoloV8Detection(Node):
                         reason="update_rate must be > 0."
                     )
                 self.update_rate = float(param.value)
-                # Only cancel timer if it exists
-                if hasattr(self, 'timer') and self.timer is not None:
+                # Only cancel timer if it exists and is active
+                if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
                     self.timer.cancel()
                     self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")

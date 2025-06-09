@@ -53,15 +53,6 @@ color_blob_detection:
     morph_erode_iterations: 10
     morph_dilate_iterations: 8
 
-yolov8_detection:
-  ros__parameters:
-    image_topic: 'image_raw'
-    use_compressed: false
-    
-    model_name: 'puzzlebot_traffic_signs.pt'
-    confidence_threshold: 0.3
-    update_rate: 10.0
-
 line_detection:
   ros__parameters:
     image_topic: 'image_raw'
@@ -112,34 +103,14 @@ line_follow_controller:
     velocity_scale_factor: 1.0
     steering_deadband: 0.03
 
-traffic_fsm:
+traffic_light_fsm:
   ros__parameters:
     update_rate: 30.0
 
-    detection_timeout: 1.0
+    color_detection_timeout: 2.0
 
-    full_speed_scale: 1.0
-    mid_speed_scale: 0.6
+    green_velocity_scale: 1.0
+    yellow_velocity_scale: 0.6
 
-    pid_toggle_service: 'line_follow_controller/controller_on'
-    pid_parameter_service: 'line_follow_controller/set_parameters'
-    
-    stop_sign_min_area: 0.1
-
-    straight_intersection_linear_vel: 0.06
-
-    turn_intersection_linear_vel: 0.06
-    turn_intersection_angular_vel: 0.8
-
-    turn_forward_distance:  0.3
-    turn_rotation_angle: 1.57
-
-    image_width: 640
-    image_height: 480
-
-    sign_ahead_class: 'fwd'
-    sign_right_class: 'right'
-    sign_left_class: 'left'
-    sign_roadwork_class: 'triUp'
-    sign_stop_class: 'stop'
-    sign_giveway_class: 'triDwn'
+    controller_on_service: 'line_follow_controller/controller_on'
+    controller_parameter_service: 'line_follow_controller/set_parameters'

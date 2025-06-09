@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import time
 
 import rclpy
 from rclpy.node import Node
@@ -12,7 +11,7 @@ from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
 
-from std_srvs.srv import SetBool
+from std_srvs.srv import SetBool, Trigger
 
 class LineFollowController(Node):
     """
@@ -20,13 +19,21 @@ class LineFollowController(Node):
     angular velocity based on line detection error to keep the robot centered on the lane.
 
     Subscribes to:
-      - centroid_error (std_msgs/Float32): Normalized line centroid error (-1.0 to 1.0)
-    
+        - centroid_error (std_msgs/Float32): Normalized line centroid error (-1.0 to 1.0)
+
     Publishes to:
       - cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
 
+    Service Clients:
+      - line_detection/is_line_detected (std_srvs/Trigger): Checks if line is detected
+
+    Service Servers:
+      - line_follow_controller/controller_on (std_srvs/SetBool): Enable/disable controller
+
     Control logic:
-      - Maintains constant forward velocity (V = constant)
+      - If controller_on is False: stops the robot (V=0, Omega=0)
+      - If line is not detected (checked via service): stops the robot (V=0, Omega=0)
+      - If controller_on is True AND line is detected: maintains constant forward velocity and PID steering
       - Computes angular velocity using PID control based on line centroid error:
             Omega = Kp_Omega * e_line + Ki_Omega * ∫(e_line) dt + Kd_Omega * d(e_line)/dt
       
@@ -35,236 +42,230 @@ class LineFollowController(Node):
         - Positive angular velocity turns left (counter-clockwise)
         - Negative angular velocity turns right (clockwise)
 
-    The controller includes a service to enable/disable output and handles cases where
-    no line is detected by maintaining the last known steering command briefly.
+    The controller includes a service to enable/disable output and queries line detection status via service.
     """
-
+    
     def __init__(self):
         super().__init__('line_follow_controller')
         
         # Declare parameters
-        self.declare_parameter('update_rate',           60.0)         # Hz
-        self.declare_parameter('linear_velocity',       0.06)         # m/s 
-        self.declare_parameter('Kp_Omega',              0.2)          
-        self.declare_parameter('Ki_Omega',              0.1)          
-        self.declare_parameter('Kd_Omega',              0.1)          
-        self.declare_parameter('max_angular_speed',     1.5)          # rad/s 
-        self.declare_parameter('line_timeout',          0.5)          # s 
-        self.declare_parameter('velocity_scale_factor', 1.0)       
-        self.declare_parameter('steering_deadband',    0.06)         
+        self.declare_parameter('update_rate', 30.0)
+
+        self.declare_parameter('linear_velocity', 0.07)
+
+        self.declare_parameter('Kp_Omega', 0.35)
+        self.declare_parameter('Ki_Omega', 0.1)
+        self.declare_parameter('Kd_Omega', 0.1)
+
+        self.declare_parameter('max_angular_speed', 1.5)
+        
+        self.declare_parameter('velocity_scale_factor', 1.0)
+        self.declare_parameter('steering_deadband', 0.03)
     
         # Retrieve parameters
-        self.update_rate                = self.get_parameter('update_rate').value
-        self.linear_velocity            = self.get_parameter('linear_velocity').value
-        self.Kp_Omega                   = self.get_parameter('Kp_Omega').value
-        self.Ki_Omega                   = self.get_parameter('Ki_Omega').value
-        self.Kd_Omega                   = self.get_parameter('Kd_Omega').value
-        self.max_angular_speed          = self.get_parameter('max_angular_speed').value
-        self.line_timeout               = self.get_parameter('line_timeout').value
-        self.velocity_scale_factor      = self.get_parameter('velocity_scale_factor').value
-        self.steering_deadband          = self.get_parameter('steering_deadband').value
+        self.update_rate = self.get_parameter('update_rate').value
 
-        # Timer for the control loop
-        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+        self.linear_velocity = self.get_parameter('linear_velocity').value
 
-        # Register parameter update callback
-        self.add_on_set_parameters_callback(self.parameter_callback)
+        self.Kp_Omega = self.get_parameter('Kp_Omega').value
+        self.Ki_Omega = self.get_parameter('Ki_Omega').value
+        self.Kd_Omega = self.get_parameter('Kd_Omega').value
+
+        self.max_angular_speed = self.get_parameter('max_angular_speed').value
         
-        # Validate initial parameter values
+        self.velocity_scale_factor = self.get_parameter('velocity_scale_factor').value
+        self.steering_deadband = self.get_parameter('steering_deadband').value
+
+        # Timer for periodic processing
+        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+        
+        # Register the parameter callback
+        self.add_on_set_parameters_callback(self.parameter_callback)
+
+        # Service servers for pause/resume
+        self.create_service(Trigger, 'line_follow_controller/pause_timer', self.pause_timer_callback)
+        self.create_service(Trigger, 'line_follow_controller/resume_timer', self.resume_timer_callback)
+        self.timer_active = True
+
+        # Validate initial parameters
         init_params = [
-            Parameter('update_rate',                Parameter.Type.DOUBLE, self.update_rate),
-            Parameter('linear_velocity',            Parameter.Type.DOUBLE, self.linear_velocity),
-            Parameter('Kp_Omega',                   Parameter.Type.DOUBLE, self.Kp_Omega),
-            Parameter('Ki_Omega',                   Parameter.Type.DOUBLE, self.Ki_Omega),
-            Parameter('Kd_Omega',                   Parameter.Type.DOUBLE, self.Kd_Omega),
-            Parameter('max_angular_speed',          Parameter.Type.DOUBLE, self.max_angular_speed),
-            Parameter('line_timeout',               Parameter.Type.DOUBLE, self.line_timeout),
-            Parameter('velocity_scale_factor',      Parameter.Type.DOUBLE, self.velocity_scale_factor),
-            Parameter('steering_deadband',          Parameter.Type.DOUBLE, self.steering_deadband),
+            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('linear_velocity', Parameter.Type.DOUBLE, self.linear_velocity),
+            Parameter('Kp_Omega', Parameter.Type.DOUBLE, self.Kp_Omega),
+            Parameter('Ki_Omega', Parameter.Type.DOUBLE, self.Ki_Omega),
+            Parameter('Kd_Omega', Parameter.Type.DOUBLE, self.Kd_Omega),
+            Parameter('max_angular_speed', Parameter.Type.DOUBLE, self.max_angular_speed),
+            Parameter('velocity_scale_factor', Parameter.Type.DOUBLE, self.velocity_scale_factor),
+            Parameter('steering_deadband', Parameter.Type.DOUBLE, self.steering_deadband),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
         if not result.successful:
             raise RuntimeError(f"Parameter validation failed: {result.reason}")
-
+        
         # Controller state variables
-        self.line_error = 0.0                    # Current line centroid error (-1.0 to 1.0)
-        self.line_detected = False               # Whether a line is currently detected
-        self.last_line_time = None               # Timestamp of last line detection
+        self.line_error = 0.0
+        self.controller_enabled = True
         
-        # PID control variables for angular velocity
-        self.integral_e_line = 0.0               # Accumulated error for integral term
-        self.last_e_line = 0.0                   # Previous error for derivative term
-        self.last_time = None                    # Previous control loop timestamp
-        
-        # Control output state
-        self.last_angular_velocity = 0.0        # Last commanded angular velocity
-        self.controller_enabled = True          # Enable/disable controller output
-        self.has_received_data = False          # Flag to track if we've received any image data
+        # PID state
+        self.integral_error = 0.0
+        self.last_error = 0.0
 
-        # Limit logging frequency
-        self.last_log_time = 0.0
-
-        # Publisher for velocity commands
-        self.cmd_pub = self.create_publisher(
-            Twist,
-            'cmd_vel',
-            qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE)
-        )
+        # Publishers
+        self.cmd_pub = self.create_publisher(Twist, 
+                                            'cmd_vel', 
+                                            qos.QoSProfile(depth=10, reliability=qos.ReliabilityPolicy.RELIABLE))
         
-        # Publishers for debugging/monitoring
-        self.angular_cmd_pub = self.create_publisher(Float32, 'line_pid/angular_cmd', 10)
+        self.angular_cmd_pub = self.create_publisher(Float32, 'line_follow_controller/angular_cmd', qos.qos_profile_sensor_data)
 
-        # Subscriber for line detection centroid error
-        self.create_subscription(
-            Float32,
-            'centroid_error',
-            self.line_centroid_callback,
-            qos.qos_profile_sensor_data
-        )
+        # Subscribers
+        self.create_subscription(Float32, 'line_detection/centroid_error', self.error_callback, qos.qos_profile_sensor_data)
         
-        # Service server to enable/disable controller
-        self.create_service(SetBool, 'line_pid/pid_toggle', self.pid_toggle_callback)
+        # Service server for controller enable/disable
+        self.create_service(SetBool, 'line_follow_controller/controller_on', self.controller_on_callback)
+
+        # Service client to check line detection status
+        self.line_status_client = self.create_client(Trigger, 'line_detection/is_line_detected')
 
         self.get_logger().info("LineFollowController Start.")
-    
-    def line_centroid_callback(self, msg: Float32) -> None:
-        """Update line detection error from the line detection node."""
-        self.line_error = msg.data
-        self.line_detected = True
-        self.last_line_time = self.get_clock().now().nanoseconds * 1e-9
-        self.has_received_data = True  
-        
-    def pid_toggle_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
-        """Service callback to enable or disable the controller output."""
-        self.controller_enabled = not request.data  
-        response.success = True
-        if not self.controller_enabled:
-            response.message = "Line follow controller stopped."
-            # Reset PID state when stopping
-            self.integral_e_line = 0.0
-            self.last_e_line = 0.0
-            self.last_time = None
+
+    def pause_timer_callback(self, request, response):
+        """Service callback to pause the timer."""
+        if self.timer is not None and self.timer_active:
+            self.timer.cancel()
+            self.timer = None
+            self.timer_active = False
+            self.get_logger().info('Timer paused.')
+            response.success = True
+            response.message = "Timer paused."
         else:
-            response.message = "Line follow controller resumed."
+            response.success = False
+            response.message = "Timer already paused or not initialized."
+        return response
+
+    def resume_timer_callback(self, request, response):
+        """Service callback to resume the timer."""
+        if self.timer is None and not self.timer_active:
+            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+            self.timer_active = True
+            self.get_logger().info('Timer resumed.')
+            response.success = True
+            response.message = "Timer resumed."
+        else:
+            response.success = False
+            response.message = "Timer is already running."
         return response
     
-    def control_loop(self) -> None:
-        """Main control loop running at update_rate; computes and publishes velocity commands."""
-        # Get current timestamp
-        now_time = self.get_clock().now().nanoseconds * 1e-9
+    def error_callback(self, msg):
+        """Update line error."""
+        self.line_error = msg.data
         
-        # Initialize timing on first run
-        if self.last_time is None:
-            self.last_time = now_time
-            return
+    def controller_on_callback(self, request, response):
+        """Enable/disable controller service callback."""
+        self.controller_enabled = request.data
+        response.success = True
         
-        # Calculate elapsed time since last update
-        dt = now_time - self.last_time
-        if dt < 1.0 / self.update_rate:
-            return
-        self.last_time = now_time
-        
-        # If controller is disabled, return
-        if not self.controller_enabled:
-            return
-        
-        # Don't publish anything until we've received image data
-        if not self.has_received_data:
-            self.get_logger().debug("Waiting for image data...")
-            return
-
-        # Check if we've lost line detection (timeout)
-        current_time = now_time
-        line_lost = False
-        if self.last_line_time is not None:
-            time_since_line = current_time - self.last_line_time
-            if time_since_line > self.line_timeout:
-                line_lost = True
-                self.line_detected = False
-
-        # Determine the error signal to use for control
-        if self.line_detected and not line_lost:
-            # Use current line detection error
-            e_line = self.line_error
+        if self.controller_enabled:
+            response.message = "Controller enabled."
+            self.get_logger().info("Controller enabled via service.")
         else:
-            # No line detected or line lost: set error to zero and reset PID state
-            e_line = 0.0
-            # Reset PID state to prevent using stale integral/derivative terms
-            self.integral_e_line = 0.0
-            self.last_e_line = 0.0
+            response.message = "Controller disabled."
+            # Reset PID state when disabling
+            self.integral_error = 0.0
+            self.last_error = 0.0
+            self.get_logger().info("Controller disabled via service.")
             
-            if line_lost:
-                self.get_logger().warn("Line detection lost - stopping steering.")
-            elif self.last_line_time is None:
-                # Only log this once when starting up
-                pass  
+        return response
 
-        # Apply deadband to reduce small oscillations
-        if abs(e_line) < self.steering_deadband:
-            e_line = 0.0
-
-        # PID control for angular velocity (steering correction)
-        # Note: e_line is negative when line is to the left, positive when to the right
-        # We want positive angular velocity (turn left) when line is to the left (negative error)
-        # So we use -e_line to get the correct sign
-        steering_error = -e_line
-        
-        # Integral term (with windup protection)
-        self.integral_e_line += steering_error * dt
-        # Clamp integral to prevent windup
-        max_integral = self.max_angular_speed / max(self.Ki_Omega, 0.001)  # Prevent division by zero
-        self.integral_e_line = max(-max_integral, min(max_integral, self.integral_e_line))
-        
-        # Derivative term
-        derivative_e_line = (steering_error - self.last_e_line) / dt
-        
-        # Compute angular velocity using PID
-        Omega = (self.Kp_Omega * steering_error + 
-                 self.Ki_Omega * self.integral_e_line + 
-                 self.Kd_Omega * derivative_e_line)
-
-        # Save error for next iteration
-        self.last_e_line = steering_error
-
-        # Apply angular velocity constraints
-        Omega = max(-self.max_angular_speed, min(self.max_angular_speed, Omega))
-        
-        # Store the computed angular velocity
-        self.last_angular_velocity = Omega
-
-        # Apply velocity scaling
-        linear_vel = self.linear_velocity * self.velocity_scale_factor
-        angular_vel = Omega * self.velocity_scale_factor
-
-        # Create and publish the velocity command
-        cmd = Twist()
-        cmd.linear.x = linear_vel
-        cmd.angular.z = angular_vel
-        self.cmd_pub.publish(cmd)
-
-        # Publish angular command for monitoring
-        self.angular_cmd_pub.publish(Float32(data=angular_vel))
-
-        # Periodic logging (limit frequency)
-        current_log_time = time.time()
-        if current_log_time - self.last_log_time > 1.0:  # Log once per second
-            if self.line_detected and not line_lost:
-                status = "ACTIVE"
-            elif line_lost:
-                status = "LOST"
-            elif self.last_line_time is None:
-                status = "WAITING"
+    def is_line_detected(self):
+        """Check if line is detected via service call."""
+        if not self.line_status_client.service_is_ready():
+            self.get_logger().warn("Line detection service not available.")
+            return False
+            
+        try:
+            request = Trigger.Request()
+            future = self.line_status_client.call_async(request)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=0.1)
+            
+            if future.result() is not None:
+                return future.result().success
             else:
-                status = "NO_DATA"
+                self.get_logger().warn("Line detection service call failed.")
+                return False
+        except Exception as e:
+            self.get_logger().warn(f"Error calling line detection service: {e}")
+            return False
+    
+    def control_loop(self):
+        """Main control loop."""
+        if not self.timer_active:
+            return
+    
+        # Calculate dt based on update rate
+        dt = 1.0 / self.update_rate
+        
+        # Create command message
+        cmd = Twist()
+        
+        # Check if controller is enabled
+        if not self.controller_enabled:
+            cmd.linear.x = 0.0
+            cmd.angular.z = 0.0
+            status = "CONTROLLER_DISABLED"
+        else:
+            # Check if line is detected
+            line_detected = self.is_line_detected()
+            
+            if not line_detected:
+                cmd.linear.x = 0.0
+                cmd.angular.z = 0.0
+                status = "NO_LINE_DETECTED"
+                # Reset PID when line is lost
+                self.integral_error = 0.0
+                self.last_error = 0.0
+            else:
+                # Line detected and controller enabled - do PID control
+                error = self.line_error
                 
-            self.get_logger().info(
-                f"Line Follow -> status={status}, error={e_line:.3f}, V={linear_vel:.3f}, Omega={angular_vel:.3f}"
-            )
-            self.last_log_time = current_log_time
+                # Apply deadband
+                if abs(error) < self.steering_deadband:
+                    error = 0.0
+                
+                # PID calculation (flip sign for correct steering)
+                steering_error = -error
+                
+                # Integral with windup protection
+                self.integral_error += steering_error * dt
+                max_integral = self.max_angular_speed / max(self.Ki_Omega, 0.001)
+                self.integral_error = max(-max_integral, min(max_integral, self.integral_error))
+                
+                # Derivative
+                derivative = (steering_error - self.last_error) / dt
+                self.last_error = steering_error
+                
+                # PID output
+                angular_vel = (self.Kp_Omega * steering_error + 
+                              self.Ki_Omega * self.integral_error + 
+                              self.Kd_Omega * derivative)
+                
+                # Apply limits and scaling
+                angular_vel = max(-self.max_angular_speed, min(self.max_angular_speed, angular_vel))
+                
+                cmd.linear.x = self.linear_velocity * self.velocity_scale_factor
+                cmd.angular.z = angular_vel * self.velocity_scale_factor
+                status = "ACTIVE"
 
-    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
-        """Validates and applies updated node parameters."""
+        # Publish commands
+        self.cmd_pub.publish(cmd)
+        self.angular_cmd_pub.publish(Float32(data=cmd.angular.z))
+
+        # Log periodically using ROS 2 throttle
+        self.get_logger().info(f"Status: {status}, V={cmd.linear.x:.3f}, Ω={cmd.angular.z:.3f}", 
+                              throttle_duration_sec=1.0)
+
+    def parameter_callback(self, params):
+        """Validate and update parameters."""
         for param in params:
             if param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
@@ -273,64 +274,36 @@ class LineFollowController(Node):
                         reason="update_rate must be > 0."
                     )
                 self.update_rate = float(param.value)
-                # Recreate timer with new rate
-                self.timer.cancel()
-                self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+                # Only cancel timer if it exists and is active
+                if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
+                    self.timer.cancel()
+                    self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name == 'linear_velocity':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="linear_velocity must be a non-negative number."
-                    )
+                    return SetParametersResult(successful=False, reason="linear_velocity must be >= 0.")
                 self.linear_velocity = float(param.value)
-                self.get_logger().info(f"linear_velocity updated: {self.linear_velocity} m/s.")
 
             elif param.name in ('Kp_Omega', 'Ki_Omega', 'Kd_Omega'):
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason=f"{param.name} must be a non-negative number."
-                    )
+                    return SetParametersResult(successful=False, reason=f"{param.name} must be >= 0.")
                 setattr(self, param.name, float(param.value))
-                self.get_logger().info(f"{param.name} updated: {param.value}.")
 
             elif param.name == 'max_angular_speed':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="max_angular_speed must be > 0."
-                    )
+                    return SetParametersResult(successful=False, reason="max_angular_speed must be > 0.")
                 self.max_angular_speed = float(param.value)
-                self.get_logger().info(f"max_angular_speed updated: {self.max_angular_speed} rad/s.")
-
-            elif param.name == 'line_timeout':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="line_timeout must be a non-negative number."
-                    )
-                self.line_timeout = float(param.value)
-                self.get_logger().info(f"line_timeout updated: {self.line_timeout} s.")
 
             elif param.name == 'velocity_scale_factor':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="velocity_scale_factor must be a non-negative number."
-                    )
+                    return SetParametersResult(successful=False, reason="velocity_scale_factor must be >= 0.")
                 self.velocity_scale_factor = float(param.value)
-                self.get_logger().info(f"velocity_scale_factor updated: {self.velocity_scale_factor}.")
 
             elif param.name == 'steering_deadband':
                 if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="steering_deadband must be a non-negative number."
-                    )
+                    return SetParametersResult(successful=False, reason="steering_deadband must be >= 0.")
                 self.steering_deadband = float(param.value)
-                self.get_logger().info(f"steering_deadband updated: {self.steering_deadband}.")
 
         return SetParametersResult(successful=True)
 
@@ -339,18 +312,14 @@ def main(args=None):
 
     try:
         node = LineFollowController()
-    except Exception as e:
-        print(f"[FATAL] LineFollowController failed to initialize: {e}.", file=sys.stderr)
-        rclpy.shutdown()
-        return
-
-    try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("Interrupted with Ctrl+C.")
+        node.get_logger().info("Interrupted.")
+    except Exception as e:
+        print(f"[FATAL] LineFollowController failed: {e}", file=sys.stderr)
     finally:
-        node.destroy_node()
         if rclpy.ok():
+            node.destroy_node()
             rclpy.shutdown()
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ from rcl_interfaces.msg import SetParametersResult
 from puzzlebot_utils.utils.vision_helpers import get_color_mask
 
 from sensor_msgs.msg import Image, CompressedImage
+from std_srvs.srv import Trigger
 
 from custom_interfaces.msg import ColorBlobDetection
 
@@ -23,70 +24,73 @@ class ColorBlobDetectionNode(Node):
     Publishes the color of the largest detected blob to a custom message topic.
     Supported colors: RED, GREEN, YELLOW (with double HSV range for RED).
     """
+    
     def __init__(self):
         super().__init__('color_blob_detection_node')
 
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
-        self.declare_parameter('update_rate', 100.0)    # Hz
         self.declare_parameter('use_compressed', False)
 
+        self.declare_parameter('update_rate', 30.0)    # Hz
+
         # GREEN HSV ranges
-        self.declare_parameter('hsv_green_h_low', 40)
-        self.declare_parameter('hsv_green_s_low', 70)
-        self.declare_parameter('hsv_green_v_low', 70)
-        self.declare_parameter('hsv_green_h_high', 80)
+        self.declare_parameter('hsv_green_h_low', 50)
+        self.declare_parameter('hsv_green_s_low', 35)
+        self.declare_parameter('hsv_green_v_low', 40)
+        self.declare_parameter('hsv_green_h_high', 110)
         self.declare_parameter('hsv_green_s_high', 255)
         self.declare_parameter('hsv_green_v_high', 255)
 
         # YELLOW HSV ranges
-        self.declare_parameter('hsv_yellow_h_low', 20)        
-        self.declare_parameter('hsv_yellow_s_low', 150)
-        self.declare_parameter('hsv_yellow_v_low', 150)
-        self.declare_parameter('hsv_yellow_h_high', 35)
+        self.declare_parameter('hsv_yellow_h_low', 15)        
+        self.declare_parameter('hsv_yellow_s_low', 40)
+        self.declare_parameter('hsv_yellow_v_low', 90)
+        self.declare_parameter('hsv_yellow_h_high', 40)
         self.declare_parameter('hsv_yellow_s_high', 255)
         self.declare_parameter('hsv_yellow_v_high', 255)
 
         # RED HSV ranges (two ranges for red wraparound)
         self.declare_parameter('hsv_red1_h_low', 0)
-        self.declare_parameter('hsv_red1_s_low', 100)
+        self.declare_parameter('hsv_red1_s_low', 60)
         self.declare_parameter('hsv_red1_v_low', 100)
         self.declare_parameter('hsv_red1_h_high', 10)
         self.declare_parameter('hsv_red1_s_high', 255)
         self.declare_parameter('hsv_red1_v_high', 255)
 
         self.declare_parameter('hsv_red2_h_low', 160)
-        self.declare_parameter('hsv_red2_s_low', 100)
+        self.declare_parameter('hsv_red2_s_low', 60)
         self.declare_parameter('hsv_red2_v_low', 100)
         self.declare_parameter('hsv_red2_h_high', 180)
         self.declare_parameter('hsv_red2_s_high', 255)
         self.declare_parameter('hsv_red2_v_high', 255)
 
         # Blob detector parameters
-        self.declare_parameter('blob_min_threshold', 30)
-        self.declare_parameter('blob_max_threshold', 255)
-        self.declare_parameter('blob_min_area', 30)
+        self.declare_parameter('blob_min_threshold', 10)
+        self.declare_parameter('blob_max_threshold', 250)
+        self.declare_parameter('blob_min_area', 200)
         self.declare_parameter('blob_max_area', 10000000)
-        self.declare_parameter('blob_min_convexity', 0.1)
+        self.declare_parameter('blob_min_convexity', 0.5)
         self.declare_parameter('blob_max_convexity', 1.0)
-        self.declare_parameter('blob_min_circularity', 0.5)
+        self.declare_parameter('blob_min_circularity', 0.8)
         self.declare_parameter('blob_max_circularity', 1.0)
-        self.declare_parameter('blob_min_inertia_ratio', 0.5)
+        self.declare_parameter('blob_min_inertia_ratio', 0.2)
         self.declare_parameter('blob_max_inertia_ratio', 1.0)
 
         # Image processing parameters
         self.declare_parameter('gaussian_kernel_size_width', 9)
         self.declare_parameter('gaussian_kernel_size_height', 9)
-        self.declare_parameter('gaussian_sigma', 2)
-        self.declare_parameter('grayscale_threshold', 5)
+        self.declare_parameter('gaussian_sigma', 5)
+        self.declare_parameter('grayscale_threshold', 10)
         self.declare_parameter('morph_kernel_size_width', 3)
         self.declare_parameter('morph_kernel_size_height', 3)
-        self.declare_parameter('morph_erode_iterations', 8)
+        self.declare_parameter('morph_erode_iterations', 10)
         self.declare_parameter('morph_dilate_iterations', 8)
 
         # Retrieve parameters
         self.image_topic = self.get_parameter('image_topic').value
         self.use_compressed = self.get_parameter('use_compressed').value
+        
         self.update_rate = self.get_parameter('update_rate').value
 
         self.hsv_green_h_low = self.get_parameter('hsv_green_h_low').value
@@ -139,9 +143,14 @@ class ColorBlobDetectionNode(Node):
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+        self.timer_active = True  # Track timer state
 
         # Register the on‐set‐parameters callback
         self.add_on_set_parameters_callback(self.parameter_callback)
+
+        # Service servers for pause/resume
+        self.create_service(Trigger, 'color_blob_detection/pause_timer', self.pause_timer_callback)
+        self.create_service(Trigger, 'color_blob_detection/resume_timer', self.resume_timer_callback)
 
         # Validate initial parameters
         init_params = [
@@ -203,15 +212,15 @@ class ColorBlobDetectionNode(Node):
         # Color blob detection publisher
         self.color_blob_detection_pub = self.create_publisher(
             ColorBlobDetection, 
-            'color_blob_detection', 
-            10
+            'color_blob_detection',  
+            qos.qos_profile_sensor_data  
         )
 
         # Debug image publisher
         self.color_blob_detection_image_pub = self.create_publisher(
             Image, 
             'color_blob_detection_image', 
-            10
+            qos.qos_profile_sensor_data
         )
 
         # Create subscribers based on compression setting
@@ -252,17 +261,33 @@ class ColorBlobDetectionNode(Node):
         self.configure_blob_detector()
 
         self.get_logger().info("ColorBlobDetection Start.")
+    
+    def pause_timer_callback(self, request, response):
+        """Service callback to pause the timer."""
+        if self.timer is not None and self.timer_active:
+            self.timer.cancel()
+            self.timer = None
+            self.timer_active = False
+            self.get_logger().info('Timer paused.')
+            response.success = True
+            response.message = "Timer paused."
+        else:
+            response.success = False
+            response.message = "Timer already paused or not initialized."
+        return response
 
-    def image_callback(self, msg) -> None:
-        """Callback to convert ROS image to OpenCV format and store it."""
-        try:
-            if self.use_compressed:
-                self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            else:
-                self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        except CvBridgeError as e:
-            self.get_logger().error(f"CvBridgeError: {e}.")
-            return
+    def resume_timer_callback(self, request, response):
+        """Service callback to resume the timer."""
+        if self.timer is None and not self.timer_active:
+            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+            self.timer_active = True
+            self.get_logger().info('Timer resumed.')
+            response.success = True
+            response.message = "Timer resumed."
+        else:
+            response.success = False
+            response.message = "Timer is already running."
+        return response
         
     def update_hsv_ranges(self):
         """Update HSV ranges dictionary from individual parameters."""
@@ -287,8 +312,43 @@ class ColorBlobDetectionNode(Node):
             ]
         }
 
+    def configure_blob_detector(self) -> None:
+        """Configure OpenCV SimpleBlobDetector with loaded parameters."""
+        params = cv.SimpleBlobDetector_Params()
+        params.minThreshold = self.blob_min_threshold
+        params.maxThreshold = self.blob_max_threshold
+        params.filterByColor = True
+        params.blobColor = 255
+        params.filterByArea = True
+        params.minArea = self.blob_min_area
+        params.maxArea = self.blob_max_area
+        params.filterByConvexity = True
+        params.minConvexity = self.blob_min_convexity
+        params.maxConvexity = self.blob_max_convexity
+        params.filterByCircularity = True
+        params.minCircularity = self.blob_min_circularity
+        params.maxCircularity = self.blob_max_circularity
+        params.filterByInertia = True
+        params.minInertiaRatio = self.blob_min_inertia_ratio
+        params.maxInertiaRatio = self.blob_max_inertia_ratio
+        self.blob_detector = cv.SimpleBlobDetector_create(params)
+
+    def image_callback(self, msg):
+        """Callback to convert ROS image to OpenCV format and store it."""
+        try:
+            if self.use_compressed:
+                self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            else:
+                self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except CvBridgeError as e:
+            self.get_logger().error(f"CvBridgeError: {e}")
+            
     def timer_callback(self) -> None:
         """Main timer function to process images and detect color blobs."""
+        # Safety check - timer should be active
+        if not self.timer_active:
+            return
+            
         # Check if image has been received
         if self.image is None:
             return
@@ -449,8 +509,10 @@ class ColorBlobDetectionNode(Node):
                 if not isinstance(value, (int, float)) or value <= 0.0:
                     return SetParametersResult(successful=False, reason="update_rate must be > 0.")
                 self.update_rate = float(value)
-                self.timer.cancel()
-                self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+                # Only restart timer if it's active
+                if self.timer_active and self.timer is not None:
+                    self.timer.cancel()
+                    self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif name.startswith('hsv_') and ('_low' in name or '_high' in name):
@@ -491,27 +553,6 @@ class ColorBlobDetectionNode(Node):
             self.configure_blob_detector()
 
         return SetParametersResult(successful=True)
-
-    def configure_blob_detector(self) -> None:
-        """Configure OpenCV SimpleBlobDetector with loaded parameters."""
-        params = cv.SimpleBlobDetector_Params()
-        params.minThreshold = self.blob_min_threshold
-        params.maxThreshold = self.blob_max_threshold
-        params.filterByColor = True
-        params.blobColor = 255
-        params.filterByArea = True
-        params.minArea = self.blob_min_area
-        params.maxArea = self.blob_max_area
-        params.filterByConvexity = True
-        params.minConvexity = self.blob_min_convexity
-        params.maxConvexity = self.blob_max_convexity
-        params.filterByCircularity = True
-        params.minCircularity = self.blob_min_circularity
-        params.maxCircularity = self.blob_max_circularity
-        params.filterByInertia = True
-        params.minInertiaRatio = self.blob_min_inertia_ratio
-        params.maxInertiaRatio = self.blob_max_inertia_ratio
-        self.blob_detector = cv.SimpleBlobDetector_create(params)
 
     def destroy_node(self):
         cv.destroyAllWindows()

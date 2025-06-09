@@ -9,13 +9,6 @@ def generate_launch_description():
     pkg_bringup = get_package_share_directory('puzzlebot_bringup')
     shared_param_file = os.path.join(pkg_bringup, 'config', 'traffic_light_fsm_config.yaml')
 
-    traffic_light_fsm_node = Node(
-        package='puzzlebot_behavior',
-        executable='traffic_light_fsm',
-        name='traffic_light_fsm',
-        parameters=[shared_param_file]
-    )
-
     color_blob_detection_node = Node(
         package='puzzlebot_vision',
         executable='color_blob_detection',
@@ -44,10 +37,17 @@ def generate_launch_description():
         parameters=[shared_param_file]
     )
 
+    traffic_light_fsm_node = Node(
+        package='puzzlebot_behavior',
+        executable='traffic_light_fsm',
+        name='traffic_light_fsm',
+        parameters=[shared_param_file]
+    )
+
     return LaunchDescription([
-        traffic_light_fsm_node,
         color_blob_detection_node,
         odometry_localization_node,
         pid_path_generator_node,
-        pid_point_controller_node
+        pid_point_controller_node,
+        traffic_light_fsm_node
     ])
