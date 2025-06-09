@@ -19,12 +19,11 @@ class LineDectection(Node):
         super().__init__('line_detection')
 
         # Declare parameters
+        self.declare_parameter('image_topic', 'image_raw')
+        self.declare_parameter('use_compressed', False)
         self.declare_parameter('update_rate', 30.0)
         self.declare_parameter('target_width', 640)      # pixels
         self.declare_parameter('target_height', 480)
-
-         # Input topic selection
-        self.declare_parameter('use_compressed', False)
         
         # Bird's eye view perspective transformation points
         # These should be calibrated for your specific camera setup
@@ -59,6 +58,8 @@ class LineDectection(Node):
         self.declare_parameter('min_line_height', 100)  
         
         # Retrieve parameters
+        self.image_topic = self.get_parameter('image_topic').value
+        self.use_compressed = self.get_parameter('use_compressed').value
         self.update_rate = self.get_parameter('update_rate').value
         self.target_width = self.get_parameter('target_width').value
         self.target_height = self.get_parameter('target_height').value
@@ -85,9 +86,6 @@ class LineDectection(Node):
         self.min_line_continuity_area = self.get_parameter('min_line_continuity_area').value
         self.min_line_height = self.get_parameter('min_line_height').value
 
-        self.use_compressed = self.get_parameter('use_compressed').value
-
-
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
 
@@ -96,6 +94,8 @@ class LineDectection(Node):
         
         # Validate initial parameters
         init_params = [
+            Parameter('image_topic',                Parameter.Type.STRING,  self.image_topic),
+            Parameter('use_compressed',             Parameter.Type.BOOL,    self.use_compressed),
             Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
             Parameter('target_width',               Parameter.Type.INTEGER, self.target_width),
             Parameter('target_height',              Parameter.Type.INTEGER, self.target_height),
@@ -140,22 +140,18 @@ class LineDectection(Node):
         self.centroid_error_pub = self.create_publisher(Float32, 'centroid_error', 10)
         self.line_detected_pub = self.create_publisher(Bool, 'line_detected', 10)
 
-        # Subscriber
-        # self.subscription = self.create_subscription(
-        #     CompressedImage, 'image_raw/compressed', self.image_callback, qos.qos_profile_sensor_data
-        # )
-
+        # Create subscribers based on compression setting
         if self.use_compressed:
             self.create_subscription(
                 CompressedImage,
-                f"image_raw/compressed",
+                f"{self.image_topic}/compressed",
                 self.image_callback,
                 qos.qos_profile_sensor_data
             )
         else:
             self.create_subscription(
                 Image,
-                'image_raw',
+                self.image_topic,
                 self.image_callback,
                 qos.qos_profile_sensor_data
             )
@@ -264,7 +260,6 @@ class LineDectection(Node):
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            # self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
             if self.use_compressed:
                 self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
             else:
@@ -385,7 +380,25 @@ class LineDectection(Node):
         perspective_changed = False
         
         for param in params:
-            if param.name == 'update_rate':
+            if param.name == 'image_topic':
+                if not isinstance(param.value, str) or len(param.value.strip()) == 0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="image_topic must be a non-empty string."
+                    )
+                self.image_topic = param.value
+                self.get_logger().info(f"image_topic updated: {self.image_topic}. Note: Restart node to apply topic change.")
+
+            elif param.name == 'use_compressed':
+                if not isinstance(param.value, bool):
+                    return SetParametersResult(
+                        successful=False,
+                        reason="use_compressed must be a boolean."
+                    )
+                self.use_compressed = param.value
+                self.get_logger().info(f"use_compressed updated: {self.use_compressed}. Note: Restart node to apply compression change.")
+
+            elif param.name == 'update_rate':
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
                     return SetParametersResult(
                         successful=False,

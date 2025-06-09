@@ -21,18 +21,18 @@ class YoloV8Detection(Node):
         super().__init__('yolov8_detection')
         
         # Declare parameters
+        self.declare_parameter('image_topic', 'image_raw')
+        self.declare_parameter('use_compressed', False)
         self.declare_parameter('model_name', 'puzzlebot_traffic_signs.pt')
         self.declare_parameter('confidence_threshold', 0.5)
         self.declare_parameter('update_rate', 10.0)
-        
-        # Input topic selection
-        self.declare_parameter('use_compressed', False)
 
         # Retrieve parameters
+        self.image_topic = self.get_parameter('image_topic').value
+        self.use_compressed = self.get_parameter('use_compressed').value
         self.model_name = self.get_parameter('model_name').value
         self.confidence_threshold = self.get_parameter('confidence_threshold').value
         self.update_rate = self.get_parameter('update_rate').value
-        self.use_compressed = self.get_parameter('use_compressed').value
         
         # Initialize variables
         self.bridge = CvBridge()
@@ -49,29 +49,35 @@ class YoloV8Detection(Node):
         # Register the parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
         
+        # Validate initial parameters
+        init_params = [
+            Parameter('image_topic',            Parameter.Type.STRING,  self.image_topic),
+            Parameter('use_compressed',         Parameter.Type.BOOL,    self.use_compressed),
+            Parameter('model_name',             Parameter.Type.STRING,  self.model_name),
+            Parameter('confidence_threshold',   Parameter.Type.DOUBLE,  self.confidence_threshold),
+            Parameter('update_rate',            Parameter.Type.DOUBLE,  self.update_rate),
+        ]
+
+        result: SetParametersResult = self.parameter_callback(init_params)
+        if not result.successful:
+            raise RuntimeError(f"Parameter validation failed: {result.reason}")
+        
         # Publishers
         self.yolov8_pub = self.create_publisher(Yolov8Inference, "/Yolov8_Inference", 10)
         self.image_pub = self.create_publisher(Image, "/inference_result", 10)
         
-        # Subscriber
-        # self.subscription = self.create_subscription(
-        #     Image,
-        #     'image_raw', 
-        #     self.image_callback, 
-        #     qos.qos_profile_sensor_data
-        # )
-
+        # Create subscribers based on compression setting
         if self.use_compressed:
             self.create_subscription(
                 CompressedImage,
-                f"image_raw/compressed",
+                f"{self.image_topic}/compressed",
                 self.image_callback,
                 qos.qos_profile_sensor_data
             )
         else:
             self.create_subscription(
                 Image,
-                'image_raw',
+                self.image_topic,
                 self.image_callback,
                 qos.qos_profile_sensor_data
             )
@@ -97,9 +103,6 @@ class YoloV8Detection(Node):
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
         try:
-            # First decode the image
-            # self.image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-
             if self.use_compressed:
                 self.image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='passthrough')
             else:
@@ -175,7 +178,25 @@ class YoloV8Detection(Node):
         model_changed = False
         
         for param in params:
-            if param.name == 'model_name':
+            if param.name == 'image_topic':
+                if not isinstance(param.value, str) or len(param.value.strip()) == 0:
+                    return SetParametersResult(
+                        successful=False,
+                        reason="image_topic must be a non-empty string."
+                    )
+                self.image_topic = param.value
+                self.get_logger().info(f"image_topic updated: {self.image_topic}. Note: Restart node to apply topic change.")
+
+            elif param.name == 'use_compressed':
+                if not isinstance(param.value, bool):
+                    return SetParametersResult(
+                        successful=False,
+                        reason="use_compressed must be a boolean."
+                    )
+                self.use_compressed = param.value
+                self.get_logger().info(f"use_compressed updated: {self.use_compressed}. Note: Restart node to apply compression change.")
+
+            elif param.name == 'model_name':
                 if not isinstance(param.value, str) or len(param.value.strip()) == 0:
                     return SetParametersResult(
                         successful=False,
