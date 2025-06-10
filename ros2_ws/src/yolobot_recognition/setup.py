@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'yolov8_recognition = yolobot_recognition.yolov8_recognition:main',
+            'yolov8_detection = yolobot_recognition.yolov8_detection:main',
         ],
     },
 )

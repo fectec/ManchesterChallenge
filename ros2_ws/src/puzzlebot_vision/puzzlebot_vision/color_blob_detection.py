@@ -14,7 +14,6 @@ from rcl_interfaces.msg import SetParametersResult
 from puzzlebot_utils.utils.vision_helpers import get_color_mask
 
 from sensor_msgs.msg import Image, CompressedImage
-from std_srvs.srv import Trigger
 
 from custom_interfaces.msg import ColorBlobDetection
 
@@ -32,35 +31,35 @@ class ColorBlobDetectionNode(Node):
         self.declare_parameter('image_topic', 'image_raw')
         self.declare_parameter('use_compressed', False)
 
-        self.declare_parameter('update_rate', 30.0)    # Hz
+        self.declare_parameter('update_rate', 60.0)    # Hz
 
         # GREEN HSV ranges
-        self.declare_parameter('hsv_green_h_low', 50)
-        self.declare_parameter('hsv_green_s_low', 35)
-        self.declare_parameter('hsv_green_v_low', 40)
-        self.declare_parameter('hsv_green_h_high', 110)
+        self.declare_parameter('hsv_green_h_low', 40)
+        self.declare_parameter('hsv_green_s_low', 50)
+        self.declare_parameter('hsv_green_v_low', 50)
+        self.declare_parameter('hsv_green_h_high', 80)
         self.declare_parameter('hsv_green_s_high', 255)
         self.declare_parameter('hsv_green_v_high', 255)
 
         # YELLOW HSV ranges
-        self.declare_parameter('hsv_yellow_h_low', 15)        
-        self.declare_parameter('hsv_yellow_s_low', 40)
-        self.declare_parameter('hsv_yellow_v_low', 90)
-        self.declare_parameter('hsv_yellow_h_high', 40)
+        self.declare_parameter('hsv_yellow_h_low', 20)        
+        self.declare_parameter('hsv_yellow_s_low', 100)
+        self.declare_parameter('hsv_yellow_v_low', 100)
+        self.declare_parameter('hsv_yellow_h_high', 30)
         self.declare_parameter('hsv_yellow_s_high', 255)
         self.declare_parameter('hsv_yellow_v_high', 255)
 
         # RED HSV ranges (two ranges for red wraparound)
         self.declare_parameter('hsv_red1_h_low', 0)
-        self.declare_parameter('hsv_red1_s_low', 60)
-        self.declare_parameter('hsv_red1_v_low', 100)
+        self.declare_parameter('hsv_red1_s_low', 120)
+        self.declare_parameter('hsv_red1_v_low', 70)
         self.declare_parameter('hsv_red1_h_high', 10)
         self.declare_parameter('hsv_red1_s_high', 255)
         self.declare_parameter('hsv_red1_v_high', 255)
 
-        self.declare_parameter('hsv_red2_h_low', 160)
-        self.declare_parameter('hsv_red2_s_low', 60)
-        self.declare_parameter('hsv_red2_v_low', 100)
+        self.declare_parameter('hsv_red2_h_low', 170)
+        self.declare_parameter('hsv_red2_s_low', 120)
+        self.declare_parameter('hsv_red2_v_low', 70)
         self.declare_parameter('hsv_red2_h_high', 180)
         self.declare_parameter('hsv_red2_s_high', 255)
         self.declare_parameter('hsv_red2_v_high', 255)
@@ -121,16 +120,16 @@ class ColorBlobDetectionNode(Node):
         self.hsv_red2_s_high = self.get_parameter('hsv_red2_s_high').value
         self.hsv_red2_v_high = self.get_parameter('hsv_red2_v_high').value
 
-        self.blob_min_threshold         = self.get_parameter('blob_min_threshold').value
-        self.blob_max_threshold         = self.get_parameter('blob_max_threshold').value
-        self.blob_min_area              = self.get_parameter('blob_min_area').value
-        self.blob_max_area              = self.get_parameter('blob_max_area').value
-        self.blob_min_convexity         = self.get_parameter('blob_min_convexity').value
-        self.blob_max_convexity         = self.get_parameter('blob_max_convexity').value
-        self.blob_min_circularity       = self.get_parameter('blob_min_circularity').value
-        self.blob_max_circularity       = self.get_parameter('blob_max_circularity').value
-        self.blob_min_inertia_ratio     = self.get_parameter('blob_min_inertia_ratio').value
-        self.blob_max_inertia_ratio     = self.get_parameter('blob_max_inertia_ratio').value
+        self.blob_min_threshold = self.get_parameter('blob_min_threshold').value
+        self.blob_max_threshold = self.get_parameter('blob_max_threshold').value
+        self.blob_min_area = self.get_parameter('blob_min_area').value
+        self.blob_max_area = self.get_parameter('blob_max_area').value
+        self.blob_min_convexity = self.get_parameter('blob_min_convexity').value
+        self.blob_max_convexity = self.get_parameter('blob_max_convexity').value
+        self.blob_min_circularity = self.get_parameter('blob_min_circularity').value
+        self.blob_max_circularity = self.get_parameter('blob_max_circularity').value
+        self.blob_min_inertia_ratio = self.get_parameter('blob_min_inertia_ratio').value
+        self.blob_max_inertia_ratio = self.get_parameter('blob_max_inertia_ratio').value
 
         self.gaussian_kernel_size_width = self.get_parameter('gaussian_kernel_size_width').value
         self.gaussian_kernel_size_height = self.get_parameter('gaussian_kernel_size_height').value
@@ -143,68 +142,63 @@ class ColorBlobDetectionNode(Node):
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-        self.timer_active = True  # Track timer state
 
-        # Register the on‐set‐parameters callback
+        # Register the parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
-
-        # Service servers for pause/resume
-        self.create_service(Trigger, 'color_blob_detection/pause_timer', self.pause_timer_callback)
-        self.create_service(Trigger, 'color_blob_detection/resume_timer', self.resume_timer_callback)
 
         # Validate initial parameters
         init_params = [
-            Parameter('image_topic',                    Parameter.Type.STRING,          self.image_topic),
-            Parameter('use_compressed',                 Parameter.Type.BOOL,            self.use_compressed),
-            Parameter('update_rate',                    Parameter.Type.DOUBLE,          self.update_rate),
-            Parameter('hsv_green_h_low',                Parameter.Type.INTEGER,         self.hsv_green_h_low),
-            Parameter('hsv_green_h_high',               Parameter.Type.INTEGER,         self.hsv_green_h_high),
-            Parameter('hsv_green_s_low',                Parameter.Type.INTEGER,         self.hsv_green_s_low),
-            Parameter('hsv_green_s_high',               Parameter.Type.INTEGER,         self.hsv_green_s_high),
-            Parameter('hsv_green_v_low',                Parameter.Type.INTEGER,         self.hsv_green_v_low),
-            Parameter('hsv_green_v_high',               Parameter.Type.INTEGER,         self.hsv_green_v_high),
-            Parameter('hsv_yellow_h_low',               Parameter.Type.INTEGER,         self.hsv_yellow_h_low),
-            Parameter('hsv_yellow_h_high',              Parameter.Type.INTEGER,         self.hsv_yellow_h_high),
-            Parameter('hsv_yellow_s_low',               Parameter.Type.INTEGER,         self.hsv_yellow_s_low),
-            Parameter('hsv_yellow_s_high',              Parameter.Type.INTEGER,         self.hsv_yellow_s_high),
-            Parameter('hsv_yellow_v_low',               Parameter.Type.INTEGER,         self.hsv_yellow_v_low),
-            Parameter('hsv_yellow_v_high',              Parameter.Type.INTEGER,         self.hsv_yellow_v_high),
-            Parameter('hsv_red1_h_low',                 Parameter.Type.INTEGER,         self.hsv_red1_h_low),
-            Parameter('hsv_red1_h_high',                Parameter.Type.INTEGER,         self.hsv_red1_h_high),
-            Parameter('hsv_red1_s_low',                 Parameter.Type.INTEGER,         self.hsv_red1_s_low),
-            Parameter('hsv_red1_s_high',                Parameter.Type.INTEGER,         self.hsv_red1_s_high),
-            Parameter('hsv_red1_v_low',                 Parameter.Type.INTEGER,         self.hsv_red1_v_low),
-            Parameter('hsv_red1_v_high',                Parameter.Type.INTEGER,         self.hsv_red1_v_high),
-            Parameter('hsv_red2_h_low',                 Parameter.Type.INTEGER,         self.hsv_red2_h_low),
-            Parameter('hsv_red2_h_high',                Parameter.Type.INTEGER,         self.hsv_red2_h_high),
-            Parameter('hsv_red2_s_low',                 Parameter.Type.INTEGER,         self.hsv_red2_s_low),
-            Parameter('hsv_red2_s_high',                Parameter.Type.INTEGER,         self.hsv_red2_s_high),
-            Parameter('hsv_red2_v_low',                 Parameter.Type.INTEGER,         self.hsv_red2_v_low),
-            Parameter('hsv_red2_v_high',                Parameter.Type.INTEGER,         self.hsv_red2_v_high),
-            Parameter('blob_min_threshold',             Parameter.Type.INTEGER,         self.blob_min_threshold),
-            Parameter('blob_max_threshold',             Parameter.Type.INTEGER,         self.blob_max_threshold),
-            Parameter('blob_min_area',                  Parameter.Type.INTEGER,         self.blob_min_area),
-            Parameter('blob_max_area',                  Parameter.Type.INTEGER,         self.blob_max_area),
-            Parameter('blob_min_convexity',             Parameter.Type.DOUBLE,          self.blob_min_convexity),
-            Parameter('blob_max_convexity',             Parameter.Type.DOUBLE,          self.blob_max_convexity),
-            Parameter('blob_min_circularity',           Parameter.Type.DOUBLE,          self.blob_min_circularity),
-            Parameter('blob_max_circularity',           Parameter.Type.DOUBLE,          self.blob_max_circularity),
-            Parameter('blob_min_inertia_ratio',         Parameter.Type.DOUBLE,          self.blob_min_inertia_ratio),
-            Parameter('blob_max_inertia_ratio',         Parameter.Type.DOUBLE,          self.blob_max_inertia_ratio),
-            Parameter('gaussian_kernel_size_width',     Parameter.Type.INTEGER,         self.gaussian_kernel_size_width),
-            Parameter('gaussian_kernel_size_height',    Parameter.Type.INTEGER,         self.gaussian_kernel_size_height),
-            Parameter('gaussian_sigma',                 Parameter.Type.INTEGER,         self.gaussian_sigma),
-            Parameter('grayscale_threshold',            Parameter.Type.INTEGER,         self.grayscale_threshold),
-            Parameter('morph_kernel_size_width',        Parameter.Type.INTEGER,         self.morph_kernel_size_width),
-            Parameter('morph_kernel_size_height',       Parameter.Type.INTEGER,         self.morph_kernel_size_height),
-            Parameter('morph_erode_iterations',         Parameter.Type.INTEGER,         self.morph_erode_iterations),
-            Parameter('morph_dilate_iterations',        Parameter.Type.INTEGER,         self.morph_dilate_iterations),
+            Parameter('image_topic', Parameter.Type.STRING, self.image_topic),
+            Parameter('use_compressed', Parameter.Type.BOOL, self.use_compressed),
+            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('hsv_green_h_low', Parameter.Type.INTEGER, self.hsv_green_h_low),
+            Parameter('hsv_green_h_high', Parameter.Type.INTEGER, self.hsv_green_h_high),
+            Parameter('hsv_green_s_low', Parameter.Type.INTEGER, self.hsv_green_s_low),
+            Parameter('hsv_green_s_high', Parameter.Type.INTEGER, self.hsv_green_s_high),
+            Parameter('hsv_green_v_low', Parameter.Type.INTEGER, self.hsv_green_v_low),
+            Parameter('hsv_green_v_high', Parameter.Type.INTEGER, self.hsv_green_v_high),
+            Parameter('hsv_yellow_h_low', Parameter.Type.INTEGER, self.hsv_yellow_h_low),
+            Parameter('hsv_yellow_h_high', Parameter.Type.INTEGER, self.hsv_yellow_h_high),
+            Parameter('hsv_yellow_s_low', Parameter.Type.INTEGER, self.hsv_yellow_s_low),
+            Parameter('hsv_yellow_s_high', Parameter.Type.INTEGER, self.hsv_yellow_s_high),
+            Parameter('hsv_yellow_v_low', Parameter.Type.INTEGER, self.hsv_yellow_v_low),
+            Parameter('hsv_yellow_v_high', Parameter.Type.INTEGER, self.hsv_yellow_v_high),
+            Parameter('hsv_red1_h_low', Parameter.Type.INTEGER, self.hsv_red1_h_low),
+            Parameter('hsv_red1_h_high', Parameter.Type.INTEGER, self.hsv_red1_h_high),
+            Parameter('hsv_red1_s_low', Parameter.Type.INTEGER, self.hsv_red1_s_low),
+            Parameter('hsv_red1_s_high', Parameter.Type.INTEGER, self.hsv_red1_s_high),
+            Parameter('hsv_red1_v_low', Parameter.Type.INTEGER, self.hsv_red1_v_low),
+            Parameter('hsv_red1_v_high', Parameter.Type.INTEGER, self.hsv_red1_v_high),
+            Parameter('hsv_red2_h_low', Parameter.Type.INTEGER, self.hsv_red2_h_low),
+            Parameter('hsv_red2_h_high', Parameter.Type.INTEGER, self.hsv_red2_h_high),
+            Parameter('hsv_red2_s_low', Parameter.Type.INTEGER, self.hsv_red2_s_low),
+            Parameter('hsv_red2_s_high', Parameter.Type.INTEGER, self.hsv_red2_s_high),
+            Parameter('hsv_red2_v_low', Parameter.Type.INTEGER, self.hsv_red2_v_low),
+            Parameter('hsv_red2_v_high', Parameter.Type.INTEGER, self.hsv_red2_v_high),
+            Parameter('blob_min_threshold', Parameter.Type.INTEGER, self.blob_min_threshold),
+            Parameter('blob_max_threshold', Parameter.Type.INTEGER, self.blob_max_threshold),
+            Parameter('blob_min_area', Parameter.Type.INTEGER, self.blob_min_area),
+            Parameter('blob_max_area', Parameter.Type.INTEGER, self.blob_max_area),
+            Parameter('blob_min_convexity', Parameter.Type.DOUBLE, self.blob_min_convexity),
+            Parameter('blob_max_convexity', Parameter.Type.DOUBLE, self.blob_max_convexity),
+            Parameter('blob_min_circularity', Parameter.Type.DOUBLE, self.blob_min_circularity),
+            Parameter('blob_max_circularity', Parameter.Type.DOUBLE, self.blob_max_circularity),
+            Parameter('blob_min_inertia_ratio', Parameter.Type.DOUBLE, self.blob_min_inertia_ratio),
+            Parameter('blob_max_inertia_ratio', Parameter.Type.DOUBLE, self.blob_max_inertia_ratio),
+            Parameter('gaussian_kernel_size_width', Parameter.Type.INTEGER, self.gaussian_kernel_size_width),
+            Parameter('gaussian_kernel_size_height', Parameter.Type.INTEGER, self.gaussian_kernel_size_height),
+            Parameter('gaussian_sigma', Parameter.Type.INTEGER, self.gaussian_sigma),
+            Parameter('grayscale_threshold', Parameter.Type.INTEGER, self.grayscale_threshold),
+            Parameter('morph_kernel_size_width', Parameter.Type.INTEGER, self.morph_kernel_size_width),
+            Parameter('morph_kernel_size_height', Parameter.Type.INTEGER, self.morph_kernel_size_height),
+            Parameter('morph_erode_iterations', Parameter.Type.INTEGER, self.morph_erode_iterations),
+            Parameter('morph_dilate_iterations', Parameter.Type.INTEGER, self.morph_dilate_iterations),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
         if not result.successful:
             raise RuntimeError(f"Parameter validation failed: {result.reason}")
-
+        
         # Initialize variables
         self.image = None
         self.bridge = CvBridge()
@@ -261,33 +255,6 @@ class ColorBlobDetectionNode(Node):
         self.configure_blob_detector()
 
         self.get_logger().info("ColorBlobDetection Start.")
-    
-    def pause_timer_callback(self, request, response):
-        """Service callback to pause the timer."""
-        if self.timer is not None and self.timer_active:
-            self.timer.cancel()
-            self.timer = None
-            self.timer_active = False
-            self.get_logger().info('Timer paused.')
-            response.success = True
-            response.message = "Timer paused."
-        else:
-            response.success = False
-            response.message = "Timer already paused or not initialized."
-        return response
-
-    def resume_timer_callback(self, request, response):
-        """Service callback to resume the timer."""
-        if self.timer is None and not self.timer_active:
-            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-            self.timer_active = True
-            self.get_logger().info('Timer resumed.')
-            response.success = True
-            response.message = "Timer resumed."
-        else:
-            response.success = False
-            response.message = "Timer is already running."
-        return response
         
     def update_hsv_ranges(self):
         """Update HSV ranges dictionary from individual parameters."""
@@ -345,10 +312,6 @@ class ColorBlobDetectionNode(Node):
             
     def timer_callback(self) -> None:
         """Main timer function to process images and detect color blobs."""
-        # Safety check - timer should be active
-        if not self.timer_active:
-            return
-            
         # Check if image has been received
         if self.image is None:
             return
@@ -509,8 +472,8 @@ class ColorBlobDetectionNode(Node):
                 if not isinstance(value, (int, float)) or value <= 0.0:
                     return SetParametersResult(successful=False, reason="update_rate must be > 0.")
                 self.update_rate = float(value)
-                # Only restart timer if it's active
-                if self.timer_active and self.timer is not None:
+                # Restart timer
+                if hasattr(self, 'timer') and self.timer is not None:
                     self.timer.cancel()
                     self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
@@ -564,7 +527,7 @@ def main(args=None):
     try:
         node = ColorBlobDetectionNode()
     except Exception as e:
-        print(f"[FATAL] ColorBlobDetecion failed to initialize: {e}.", file=sys.stderr)
+        print(f"[FATAL] ColorBlobDetectionNode failed to initialize: {e}", file=sys.stderr)
         rclpy.shutdown()
         return
     

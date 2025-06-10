@@ -1,9 +1,9 @@
 color_blob_detection:
   ros__parameters:
     image_topic: 'image_raw'
-    use_compressed: True
+    use_compressed: False
 
-    update_rate: 30.0
+    update_rate: 60.0
     
     hsv_green_h_low: 50
     hsv_green_s_low: 35
@@ -97,12 +97,12 @@ pid_point_controller:
 
 traffic_light_fsm:
   ros__parameters:
-    update_rate: 30.0
+    update_rate: 60.0
 
     color_detection_timeout: 2.0
 
     green_velocity_scale: 1.0
     yellow_velocity_scale: 0.6
 
-    controller_on_service: 'pid_point_controller/controller_on'
-    controller_parameter_service: 'pid_point_controller/set_parameters'
+    line_follow_controller_on_service: 'line_follow_controller/set_parameters'
+    line_follow_controller_parameter_service: 'line_follow_controller/controller_on'   

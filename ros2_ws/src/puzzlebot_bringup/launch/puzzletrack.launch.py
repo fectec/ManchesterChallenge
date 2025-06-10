@@ -19,10 +19,10 @@ def generate_launch_description():
         parameters=[shared_param_file]
     )
 
-    yolov8_recognition_node = Node(
+    yolov8_detection_node = Node(
         package='yolobot_recognition',
-        executable='yolov8_recognition',
-        name='yolov8_recognition',
+        executable='yolov8_detection',
+        name='yolov8_detection',
         parameters=[shared_param_file]
     )
 
@@ -49,7 +49,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         color_blob_detection_node,
-        yolov8_recognition_node,
+        yolov8_detection_node,
         line_detection_node,
         line_follow_controller_node,
         traffic_fsm_node

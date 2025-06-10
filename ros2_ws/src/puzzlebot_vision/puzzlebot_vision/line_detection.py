@@ -23,7 +23,7 @@ class LineDectection(Node):
         self.declare_parameter('image_topic', 'image_raw')
         self.declare_parameter('use_compressed', False)
 
-        self.declare_parameter('update_rate', 30.0)
+        self.declare_parameter('update_rate', 60.0)
 
         self.declare_parameter('target_width', 640)      # pixels
         self.declare_parameter('target_height', 480)
@@ -89,45 +89,40 @@ class LineDectection(Node):
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-
-        # Register the on‐set‐parameters callback
+        
+        # Register the parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
 
-        # Service servers for pause/resume
-        self.create_service(Trigger, 'line_detection/pause_timer', self.pause_timer_callback)
-        self.create_service(Trigger, 'line_detection/resume_timer', self.resume_timer_callback)
-        self.timer_active = True
-        
         # Validate initial parameters
         init_params = [
-            Parameter('image_topic',                Parameter.Type.STRING,  self.image_topic),
-            Parameter('use_compressed',             Parameter.Type.BOOL,    self.use_compressed),
-            Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
-            Parameter('target_width',               Parameter.Type.INTEGER, self.target_width),
-            Parameter('target_height',              Parameter.Type.INTEGER, self.target_height),
-            Parameter('perspective_tl_x',           Parameter.Type.INTEGER, self.perspective_tl_x),
-            Parameter('perspective_tl_y',           Parameter.Type.INTEGER, self.perspective_tl_y),
-            Parameter('perspective_bl_x',           Parameter.Type.INTEGER, self.perspective_bl_x),
-            Parameter('perspective_bl_y',           Parameter.Type.INTEGER, self.perspective_bl_y),
-            Parameter('perspective_tr_x',           Parameter.Type.INTEGER, self.perspective_tr_x),
-            Parameter('perspective_tr_y',           Parameter.Type.INTEGER, self.perspective_tr_y),
-            Parameter('perspective_br_x',           Parameter.Type.INTEGER, self.perspective_br_x),
-            Parameter('perspective_br_y',           Parameter.Type.INTEGER, self.perspective_br_y),
-            Parameter('gaussian_kernel_size',       Parameter.Type.INTEGER, self.gaussian_kernel_size),
-            Parameter('gaussian_sigma',             Parameter.Type.INTEGER, self.gaussian_sigma),
-            Parameter('grayscale_threshold',        Parameter.Type.INTEGER, self.grayscale_threshold),
-            Parameter('morph_kernel_size',          Parameter.Type.INTEGER, self.morph_kernel_size),
-            Parameter('morph_erode_iterations',     Parameter.Type.INTEGER, self.morph_erode_iterations),
-            Parameter('morph_dilate_iterations',    Parameter.Type.INTEGER, self.morph_dilate_iterations),
-            Parameter('min_contour_area',           Parameter.Type.INTEGER, self.min_contour_area),
-            Parameter('max_contour_area',           Parameter.Type.INTEGER, self.max_contour_area),
-            Parameter('filter_alpha',               Parameter.Type.DOUBLE,  self.filter_alpha),
+            Parameter('image_topic', Parameter.Type.STRING, self.image_topic),
+            Parameter('use_compressed', Parameter.Type.BOOL, self.use_compressed),
+            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('target_width', Parameter.Type.INTEGER, self.target_width),
+            Parameter('target_height', Parameter.Type.INTEGER, self.target_height),
+            Parameter('perspective_tl_x', Parameter.Type.INTEGER, self.perspective_tl_x),
+            Parameter('perspective_tl_y', Parameter.Type.INTEGER, self.perspective_tl_y),
+            Parameter('perspective_bl_x', Parameter.Type.INTEGER, self.perspective_bl_x),
+            Parameter('perspective_bl_y', Parameter.Type.INTEGER, self.perspective_bl_y),
+            Parameter('perspective_tr_x', Parameter.Type.INTEGER, self.perspective_tr_x),
+            Parameter('perspective_tr_y', Parameter.Type.INTEGER, self.perspective_tr_y),
+            Parameter('perspective_br_x', Parameter.Type.INTEGER, self.perspective_br_x),
+            Parameter('perspective_br_y', Parameter.Type.INTEGER, self.perspective_br_y),
+            Parameter('gaussian_kernel_size', Parameter.Type.INTEGER, self.gaussian_kernel_size),
+            Parameter('gaussian_sigma', Parameter.Type.INTEGER, self.gaussian_sigma),
+            Parameter('grayscale_threshold', Parameter.Type.INTEGER, self.grayscale_threshold),
+            Parameter('morph_kernel_size', Parameter.Type.INTEGER, self.morph_kernel_size),
+            Parameter('morph_erode_iterations', Parameter.Type.INTEGER, self.morph_erode_iterations),
+            Parameter('morph_dilate_iterations', Parameter.Type.INTEGER, self.morph_dilate_iterations),
+            Parameter('min_contour_area', Parameter.Type.INTEGER, self.min_contour_area),
+            Parameter('max_contour_area', Parameter.Type.INTEGER, self.max_contour_area),
+            Parameter('filter_alpha', Parameter.Type.DOUBLE, self.filter_alpha),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
         if not result.successful:
             raise RuntimeError(f"Parameter validation failed: {result.reason}")
-        
+
         # State for filtering
         self.last_centroid_error = None
         
@@ -169,34 +164,7 @@ class LineDectection(Node):
                 qos.qos_profile_sensor_data
             )
      
-        self.get_logger().info('LineDectection Start.')
-
-    def pause_timer_callback(self, request, response):
-        """Service callback to pause the timer."""
-        if self.timer is not None and self.timer_active:
-            self.timer.cancel()
-            self.timer = None
-            self.timer_active = False
-            self.get_logger().info('Timer paused.')
-            response.success = True
-            response.message = "Timer paused."
-        else:
-            response.success = False
-            response.message = "Timer already paused or not initialized."
-        return response
-
-    def resume_timer_callback(self, request, response):
-        """Service callback to resume the timer."""
-        if self.timer is None and not self.timer_active:
-            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
-            self.timer_active = True
-            self.get_logger().info('Timer resumed.')
-            response.success = True
-            response.message = "Timer resumed."
-        else:
-            response.success = False
-            response.message = "Timer is already running."
-        return response
+        self.get_logger().info('LineDetection Start.')
 
     def line_status_callback(self, request, response):
         """Service callback to report line detection status."""
@@ -462,8 +430,8 @@ class LineDectection(Node):
                         reason="update_rate must be > 0."
                     )
                 self.update_rate = float(param.value)
-                # Only cancel timer if it exists and is active
-                if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
+                # Restart timer
+                if hasattr(self, 'timer') and self.timer is not None:
                     self.timer.cancel()
                     self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")

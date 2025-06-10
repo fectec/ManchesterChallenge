@@ -33,15 +33,15 @@ class TrafficLightFSM(Node):
         super().__init__('traffic_light_fsm')
 
         # Declare parameters
-        self.declare_parameter('update_rate', 30.0)               # Hz
+        self.declare_parameter('update_rate', 60.0)               # Hz
 
         self.declare_parameter('color_detection_timeout', 2.0)    # s
 
         self.declare_parameter('green_velocity_scale', 1.0)     
         self.declare_parameter('yellow_velocity_scale', 0.6)  
 
-        self.declare_parameter('controller_on_service', 'pid_point_controller/controller_on')
-        self.declare_parameter('controller_parameter_service', 'pid_point_controller/set_parameters')
+        self.declare_parameter('line_follow_controller_on_service', 'line_follow_controller/controller_on')
+        self.declare_parameter('line_follow_controller_parameter_service', 'line_follow_controller/set_parameters')
 
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
@@ -51,8 +51,8 @@ class TrafficLightFSM(Node):
         self.green_velocity_scale = self.get_parameter('green_velocity_scale').value
         self.yellow_velocity_scale = self.get_parameter('yellow_velocity_scale').value
         
-        self.controller_on_service = self.get_parameter('controller_on_service').value
-        self.controller_parameter_service = self.get_parameter('controller_parameter_service').value
+        self.line_follow_controller_on_service = self.get_parameter('line_follow_controller_on_service').value
+        self.line_follow_controller_parameter_service = self.get_parameter('line_follow_controller_parameter_service').value
 
         # Timer for the FSM loop
         self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
@@ -62,12 +62,12 @@ class TrafficLightFSM(Node):
 
         # Immediately validate the initial values
         init_params = [
-            Parameter('update_rate',                Parameter.Type.DOUBLE,  self.update_rate),
-            Parameter('color_detection_timeout',    Parameter.Type.DOUBLE,  self.color_detection_timeout),
-            Parameter('green_velocity_scale',       Parameter.Type.DOUBLE,  self.green_velocity_scale),
-            Parameter('yellow_velocity_scale',      Parameter.Type.DOUBLE,  self.yellow_velocity_scale),
-            Parameter('controller_on_service',      Parameter.Type.STRING,  self.controller_on_service),
-            Parameter('controller_parameter_service', Parameter.Type.STRING, self.controller_parameter_service)
+            Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
+            Parameter('color_detection_timeout', Parameter.Type.DOUBLE, self.color_detection_timeout),
+            Parameter('green_velocity_scale', Parameter.Type.DOUBLE, self.green_velocity_scale),
+            Parameter('yellow_velocity_scale', Parameter.Type.DOUBLE, self.yellow_velocity_scale),
+            Parameter('line_follow_controller_on_service', Parameter.Type.STRING, self.line_follow_controller_on_service),
+            Parameter('line_follow_controller_parameter_service', Parameter.Type.STRING, self.line_follow_controller_parameter_service)
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -97,14 +97,14 @@ class TrafficLightFSM(Node):
         )
         
         # Create a client for enabling or disabling the controller via a service
-        self.controller_on_client = self.create_client(SetBool, self.controller_on_service)
+        self.controller_on_client = self.create_client(SetBool, self.line_follow_controller_on_service)
         while not self.controller_on_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f"{self.controller_on_service} service not available, waiting...")
+            self.get_logger().info(f"{self.line_follow_controller_on_service} service not available, waiting...")
         
         # Create a parameter client to update the controller parameters
-        self.controller_parameter_client = self.create_client(SetParameters, self.controller_parameter_service)
+        self.controller_parameter_client = self.create_client(SetParameters, self.line_follow_controller_parameter_service)
         while not self.controller_parameter_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'{self.controller_parameter_service} service not available, waiting...')
+            self.get_logger().info(f'{self.line_follow_controller_parameter_service} service not available, waiting...')
         
         self.get_logger().info('TrafficLightFSM Start.')
         self.process_state_actions()
@@ -287,18 +287,18 @@ class TrafficLightFSM(Node):
                     )
                 new_yellow_scale = float(param.value)
 
-            elif param.name == 'controller_on_service':
+            elif param.name == 'line_follow_controller_on_service':
                 if not isinstance(param.value, str) or not param.value.strip():
                     return SetParametersResult(
                         successful=False,
-                        reason="controller_on_service must be a non-empty string."
+                        reason="line_follow_controller_on_service must be a non-empty string."
                     )
 
-            elif param.name == 'controller_parameter_service':
+            elif param.name == 'line_follow_controller_parameter_service':
                 if not isinstance(param.value, str) or not param.value.strip():
                     return SetParametersResult(
                         successful=False,
-                        reason="controller_parameter_service must be a non-empty string."
+                        reason="line_follow_controller_parameter_service must be a non-empty string."
                     )
 
         # Validate green and yellow velocity scales
@@ -341,13 +341,13 @@ class TrafficLightFSM(Node):
                 self.yellow_velocity_scale = new_yellow_scale
                 self.get_logger().info(f"yellow_velocity_scale updated: {self.yellow_velocity_scale}.")
 
-            elif param.name == 'controller_on_service':
-                self.controller_on_service = param.value
-                self.get_logger().info(f"controller_on_service updated: {self.controller_on_service}.")
+            elif param.name == 'line_follow_controller_on_service':
+                self.line_follow_controller_on_service = param.value
+                self.get_logger().info(f"line_follow_controller_on_service updated: {self.line_follow_controller_on_service}.")
 
-            elif param.name == 'controller_parameter_service':
-                self.controller_parameter_service = param.value
-                self.get_logger().info(f"controller_parameter_service updated: {self.controller_parameter_service}.")
+            elif param.name == 'line_follow_controller_parameter_service':
+                self.line_follow_controller_parameter_service = param.value
+                self.get_logger().info(f"line_follow_controller_parameter_service updated: {self.line_follow_controller_parameter_service}.")
 
         return SetParametersResult(successful=True)
     

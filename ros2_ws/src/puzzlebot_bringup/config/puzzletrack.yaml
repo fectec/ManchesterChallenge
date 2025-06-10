@@ -1,9 +1,9 @@
 color_blob_detection:
   ros__parameters:
     image_topic: 'image_raw'
-    use_compressed: True
+    use_compressed: False
 
-    update_rate: 30.0
+    update_rate: 60.0
     
     hsv_green_h_low: 50
     hsv_green_s_low: 35
@@ -53,10 +53,10 @@ color_blob_detection:
     morph_erode_iterations: 10
     morph_dilate_iterations: 8
 
-yolov8_recognition:
+yolov8_detection:
   ros__parameters:
     image_topic: 'image_raw'
-    use_compressed: True
+    use_compressed: False
     
     model_name: 'puzzlebot_traffic_signs.pt'
     confidence_threshold: 0.3
@@ -67,7 +67,7 @@ line_detection:
     image_topic: 'image_raw'
     use_compressed: True
 
-    update_rate: 30.0
+    update_rate: 60.0
 
     target_width: 640
     target_height: 480
@@ -111,15 +111,15 @@ line_follow_controller:
 
 traffic_fsm:
   ros__parameters:
-    update_rate: 30.0
+    update_rate: 60.0
 
     detection_timeout: 1.0
 
     full_speed_scale: 1.0
     mid_speed_scale: 0.6
 
-    controller_on_service: 'line_follow_controller/controller_on'        
-    controller_parameter_service: 'line_follow_controller/set_parameters'
+    line_follow_controller_on_service: 'line_follow_controller/set_parameters'
+    line_follow_controller_parameter_service: 'line_follow_controller/controller_on'        
 
     stop_sign_min_area: 0.1
 
