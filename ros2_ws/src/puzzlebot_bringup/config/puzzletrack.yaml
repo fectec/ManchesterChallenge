@@ -60,7 +60,7 @@ yolov8_detection:
     
     model_name: 'puzzlebot_traffic_signs.pt'
     confidence_threshold: 0.3
-    update_rate: 10.0
+    update_rate: 15.0
 
 line_detection:
   ros__parameters:
