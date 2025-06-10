@@ -1,6 +1,8 @@
+
 #!/usr/bin/env python3
 
 import sys
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -35,29 +37,33 @@ ACTION_RIGHT_INTERSECTION = 4
 ACTION_LEFT_INTERSECTION = 5
 
 class TrafficFSM(Node):
+    """ 
+    Clean FSM implementation with non-blocking service calls and proper state management.
+    """
+
     def __init__(self):
         super().__init__('traffic_fsm')
 
-        self.declare_parameter('update_rate', 60.0)                                # Hz
+        # Declare parameters
+        self.declare_parameter('update_rate', 30.0)                                # Hz
+        self.declare_parameter('detection_timeout', 1.0)                           # s
 
-        self.declare_parameter('detection_timeout', 1.0)                           # s 
-
-        self.declare_parameter('full_speed_scale', 1.0)                                 
-        self.declare_parameter('mid_speed_scale', 0.6)        
-
-        self.declare_parameter('line_follow_controller_parameter_service', 'line_follow_controller/set_parameters')
-        self.declare_parameter('line_follow_controller_on_service', 'line_follow_controller/controller_on')
-
-        self.declare_parameter('stop_sign_min_area', 0.1)  
-
+        self.declare_parameter('full_speed_scale', 1.0)         
+        self.declare_parameter('mid_speed_scale', 0.6)   
+          
+        self.declare_parameter('controller_on_service', 'line_follow_controller/controller_on')
+        self.declare_parameter('controller_parameter_service', 'line_follow_controller/set_parameters')
+        
+        self.declare_parameter('stop_sign_min_area', 0.1)       
+        
         self.declare_parameter('straight_intersection_linear_vel', 0.06)           # m/s
-
+        
         self.declare_parameter('turn_intersection_linear_vel', 0.06)               # m/s
-        self.declare_parameter('turn_intersection_angular_vel', 1.0)               # rad/s
-
-        self.declare_parameter('turn_forward_distance', 0.35)                      # meters
+        self.declare_parameter('turn_intersection_angular_vel', 0.8)               # rad/s
+        
+        self.declare_parameter('turn_forward_distance', 0.3)                       # meters
         self.declare_parameter('turn_rotation_angle', 1.57)                        # radians
-
+        
         self.declare_parameter('image_width', 640)                                 # pixels
         self.declare_parameter('image_height', 480)                                # pixels
         
@@ -71,25 +77,23 @@ class TrafficFSM(Node):
 
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
-        
         self.detection_timeout = self.get_parameter('detection_timeout').value
-
+        
         self.full_speed_scale = self.get_parameter('full_speed_scale').value
         self.mid_speed_scale = self.get_parameter('mid_speed_scale').value
-
-        self.line_follow_controller_on_service = self.get_parameter('line_follow_controller_on_service').value 
-        self.line_follow_controller_parameter_service = self.get_parameter('line_follow_controller_parameter_service').value
-
+        
+        self.controller_on_service = self.get_parameter('controller_on_service').value
+        self.controller_parameter_service = self.get_parameter('controller_parameter_service').value
+        
         self.stop_sign_min_area = self.get_parameter('stop_sign_min_area').value
-
+        
         self.straight_intersection_linear_vel = self.get_parameter('straight_intersection_linear_vel').value
-
         self.turn_intersection_linear_vel = self.get_parameter('turn_intersection_linear_vel').value
         self.turn_intersection_angular_vel = self.get_parameter('turn_intersection_angular_vel').value
-
+        
         self.turn_forward_distance = self.get_parameter('turn_forward_distance').value
         self.turn_rotation_angle = self.get_parameter('turn_rotation_angle').value
-
+        
         self.image_width = self.get_parameter('image_width').value
         self.image_height = self.get_parameter('image_height').value
         
@@ -103,39 +107,11 @@ class TrafficFSM(Node):
             self.get_parameter('sign_giveway_class').value: SIGN_GIVE_WAY
         }
 
-        # Timer for periodic updates
+        # Timer for FSM
         self.timer = self.create_timer(1.0 / self.update_rate, self.fsm_update_loop)
         
-        # Register the on‐set‐parameters callback
+        # Register parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
-
-        # Validate initial parameters
-        init_params = [
-            Parameter('update_rate',                                Parameter.Type.DOUBLE,  self.update_rate),
-            Parameter('detection_timeout',                          Parameter.Type.DOUBLE,  self.detection_timeout),
-            Parameter('full_speed_scale',                           Parameter.Type.DOUBLE,  self.full_speed_scale),
-            Parameter('mid_speed_scale',                            Parameter.Type.DOUBLE,  self.mid_speed_scale),
-            Parameter('line_follow_controller_parameter_service',   Parameter.Type.STRING,  self.line_follow_controller_parameter_service),
-            Parameter('line_follow_controller_on_service',          Parameter.Type.STRING,  self.line_follow_controller_on_service),
-            Parameter('stop_sign_min_area',                         Parameter.Type.DOUBLE,  self.stop_sign_min_area),
-            Parameter('straight_intersection_linear_vel',           Parameter.Type.DOUBLE,  self.straight_intersection_linear_vel),
-            Parameter('turn_intersection_linear_vel',               Parameter.Type.DOUBLE,  self.turn_intersection_linear_vel),
-            Parameter('turn_intersection_angular_vel',              Parameter.Type.DOUBLE,  self.turn_intersection_angular_vel),
-            Parameter('turn_forward_distance',                      Parameter.Type.DOUBLE,  self.turn_forward_distance),
-            Parameter('turn_rotation_angle',                        Parameter.Type.DOUBLE,  self.turn_rotation_angle),
-            Parameter('image_width',                                Parameter.Type.INTEGER, self.image_width),
-            Parameter('image_height',                               Parameter.Type.INTEGER, self.image_height),
-            Parameter('sign_ahead_class',                           Parameter.Type.STRING,  self.get_parameter('sign_ahead_class').value),
-            Parameter('sign_right_class',                           Parameter.Type.STRING,  self.get_parameter('sign_right_class').value),
-            Parameter('sign_left_class',                            Parameter.Type.STRING,  self.get_parameter('sign_left_class').value),
-            Parameter('sign_roadwork_class',                        Parameter.Type.STRING,  self.get_parameter('sign_roadwork_class').value),
-            Parameter('sign_stop_class',                            Parameter.Type.STRING,  self.get_parameter('sign_stop_class').value),
-            Parameter('sign_giveway_class',                          Parameter.Type.STRING,  self.get_parameter('sign_giveway_class').value),
-        ]
-
-        result: SetParametersResult = self.parameter_callback(init_params)
-        if not result.successful:
-            raise RuntimeError(f"Parameter validation failed: {result.reason}")
 
         # Calculate durations
         self.turn_forward_duration = self.turn_forward_distance / self.turn_intersection_linear_vel
@@ -152,22 +128,22 @@ class TrafficFSM(Node):
         self.sign_lost_time = None
         
         # Controller state tracking
-        self.controller_enabled = None
+        self.controller_enabled = None          # Track current controller state
         self.current_velocity_scale = None
         
-        # Line detection state
-        self.line_detected = False
+        # Cached line detection status
+        self.line_detected_cached = False
+        self.last_line_status_check = 0.0
+        self.line_status_check_interval = 0.1   # Check every 100ms
+        self.line_status_future = None         # Track pending async call
         
-        # Internal detection flags
+        # Processing flags - when False, we ignore incoming data
         self.process_color_blob = True
         self.process_signs = True
         self.process_line_detection = True
         
         # Flag to prevent detection updates during intersection
         self.crossing_intersection = False
-        
-        # Shutdown flag
-        self.shutdown_requested = False
         
         # Publisher for velocity commands
         self.cmd_vel_pub = self.create_publisher(
@@ -198,19 +174,15 @@ class TrafficFSM(Node):
         )
         
         # Service clients for controller
-        self.controller_parameter_client = self.create_client(SetParameters, self.line_follow_controller_parameter_service)
-        while not self.controller_parameter_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'{self.line_follow_controller_parameter_service} service not available, waiting...')
-        
-        self.controller_on_client = self.create_client(SetBool, self.line_follow_controller_on_service)
-        while not self.controller_on_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f"{self.line_follow_controller_on_service} service not available, waiting...")
+        self.controller_on_client = self.create_client(SetBool, self.controller_on_service)
+        self.controller_param_client = self.create_client(SetParameters, self.controller_parameter_service)
         
         self.get_logger().info('TrafficFSM Start.')
+        self.get_logger().info(f'Controller ON service: {self.controller_on_service}')
+        self.get_logger().info(f'Controller parameter service: {self.controller_parameter_service}')
 
     def color_blob_callback(self, msg: ColorBlobDetection) -> None:
         """Process color blob detection."""
-        # Skip if we're not processing color blobs
         if not self.process_color_blob or self.crossing_intersection:
             return
             
@@ -225,7 +197,6 @@ class TrafficFSM(Node):
 
     def sign_detection_callback(self, msg: Yolov8Inference) -> None:
         """Process YOLO sign detection."""
-        # Skip if we're not processing signs
         if not self.process_signs or self.crossing_intersection:
             return
             
@@ -264,37 +235,62 @@ class TrafficFSM(Node):
                     self.last_directional_sign = self.current_sign
             self.current_sign = SIGN_NONE
 
-    def check_line_status(self):
-        """Check line detection status via service."""
+    def check_line_status_async(self):
+        """Asynchronously check line detection status and cache result."""
         if not self.process_line_detection:
-            self.line_detected = False
+            self.line_detected_cached = False
             return
             
+        current_time = self.get_clock().now().nanoseconds / 1e9
+        
+        # Only check periodically to avoid overwhelming the service
+        if current_time - self.last_line_status_check < self.line_status_check_interval:
+            return
+            
+        self.last_line_status_check = current_time
+        
+        # Check if there's already a pending request
+        if self.line_status_future is not None and not self.line_status_future.done():
+            return
+        
         if not self.line_status_client.service_is_ready():
+            self.get_logger().warn("Line detection service not ready.", throttle_duration_sec=2.0)
             return
             
         try:
             request = Trigger.Request()
-            future = self.line_status_client.call_async(request)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=0.1)
-            
-            if future.done():
-                result = future.result()
-                if result is not None:
-                    old_status = self.line_detected
-                    self.line_detected = result.success
-                    
-                    if old_status != self.line_detected:
-                        self.get_logger().info(f"Line detection status changed: {self.line_detected}.")
-                        
+            self.line_status_future = self.line_status_client.call_async(request)
+            self.line_status_future.add_done_callback(self.line_status_callback)
         except Exception as e:
-            self.get_logger().warn(f"Error checking line detection: {e}")
+            self.get_logger().warn(f"Error initiating line detection service call: {e}")
+
+    def line_status_callback(self, future):
+        """Callback for line detection status service response."""
+        try:
+            result = future.result()
+            if result is not None:
+                old_status = self.line_detected_cached
+                self.line_detected_cached = result.success
+                
+                # Log status changes
+                if old_status != self.line_detected_cached:
+                    self.get_logger().info(f"Line detection status changed: {self.line_detected_cached} ('{result.message}').")
+                    
+        except Exception as e:
+            self.get_logger().warn(f"Error processing line detection service response: {e}")
+        finally:
+            self.line_status_future = None
 
     def is_line_detected(self) -> bool:
-        """Check if line is detected."""
+        """Check if line is detected using cached status."""
         if not self.process_line_detection:
             return False
-        return self.line_detected
+            
+        # Update cache asynchronously
+        self.check_line_status_async()
+        
+        # Return cached value
+        return self.line_detected_cached
         
     def call_controller_on(self, enable: bool) -> None:
         """Enable/disable line controller via service."""
@@ -302,13 +298,17 @@ class TrafficFSM(Node):
             req = SetBool.Request()
             req.data = enable
             self.controller_on_client.call_async(req)
+        else:
+            self.get_logger().warn(f"Controller ON service not ready: {self.controller_on_service}", throttle_duration_sec=2.0)
         
     def update_controller_param(self, param_name: str, value: float) -> None:
         """Update controller parameter."""
-        if self.controller_parameter_client.service_is_ready():
+        if self.controller_param_client.service_is_ready():
             req = SetParameters.Request()
             req.parameters = [Parameter(param_name, Parameter.Type.DOUBLE, value).to_parameter_msg()]
-            self.controller_parameter_client.call_async(req)
+            self.controller_param_client.call_async(req)
+        else:
+            self.get_logger().warn(f"Controller parameter service not ready: {self.controller_parameter_service}", throttle_duration_sec=2.0)
 
     def publish_velocity_command(self, linear: float, angular: float) -> None:
         """Publish velocity command."""
@@ -317,21 +317,25 @@ class TrafficFSM(Node):
         twist.angular.z = angular
         self.cmd_vel_pub.publish(twist)
 
-    def spin_with_velocity(self, linear: float, angular: float) -> bool:
-        """Spin once while publishing velocity commands. Returns False if shutdown requested."""
-        if self.shutdown_requested:
-            return False
-            
-        self.publish_velocity_command(linear, angular)
-        rclpy.spin_once(self, timeout_sec=0.01)
-        return not self.shutdown_requested
+    def wait_seconds(self, seconds: float) -> None:
+        """Wait for specified seconds while still publishing velocity."""
+        start_time = self.get_clock().now().nanoseconds * 1e-9
+        while self.get_clock().now().nanoseconds * 1e-9 - start_time < seconds:
+            rclpy.spin_once(self, timeout_sec=0.01)
 
     def determine_action(self) -> int:
         """Determine action based on current state."""
-        # Get line detection status
+        # Get line detection status (cached)
         line_detected = self.is_line_detected()
         
-        # Stop sign or red light
+        # Log current state for debugging
+        self.get_logger().debug(
+            f"State: Line={line_detected}, Light={self._light_name(self.current_light)}, "
+            f"Sign={self._sign_name(self.current_sign)}, LastDir={self._sign_name(self.last_directional_sign)}",
+            throttle_duration_sec=1.0
+        )
+        
+        # Stop sign or red light - highest priority
         if self.current_sign == SIGN_STOP or self.current_light == ColorBlobDetection.COLOR_RED:
             return ACTION_ZERO_SPEED
         
@@ -341,10 +345,13 @@ class TrafficFSM(Node):
                         else self.last_directional_sign)
             
             if direction == SIGN_AHEAD_ONLY:
+                self.get_logger().info("Intersection detected: STRAIGHT")
                 return ACTION_STRAIGHT_INTERSECTION
             elif direction == SIGN_TURN_RIGHT_AHEAD:
+                self.get_logger().info("Intersection detected: RIGHT")
                 return ACTION_RIGHT_INTERSECTION
             elif direction == SIGN_TURN_LEFT_AHEAD:
+                self.get_logger().info("Intersection detected: LEFT")
                 return ACTION_LEFT_INTERSECTION
         
         # Normal line following cases
@@ -389,137 +396,137 @@ class TrafficFSM(Node):
         self.crossing_intersection = True
         self.get_logger().info("Starting STRAIGHT intersection crossing.")
         
-        try:
-            # Disable color blob and sign processing (keep line detection)
-            self.process_color_blob = False
-            self.process_signs = False
-            
-            # Move forward until line detected
-            self.get_logger().info("Moving forward until line detected.")
-            while not self.is_line_detected() and not self.shutdown_requested:
-                if not self.spin_with_velocity(self.straight_intersection_linear_vel, 0.0):
-                    break
-            
-            if not self.shutdown_requested:
-                self.get_logger().info("Line detected, straight intersection complete.")
-                
-        except Exception as e:
-            self.get_logger().error(f"Error during straight intersection: {e}")
-        finally:
-            # Re-enable all processing
-            self.process_color_blob = True
-            self.process_signs = True
-            self.crossing_intersection = False
-            self.get_logger().info("STRAIGHT intersection crossing complete.")
+        # 1. Disable color blob and sign processing (keep line detection active)
+        self.process_color_blob = False
+        self.process_signs = False
+        
+        # 2. Move forward until line detected
+        self.get_logger().info("Moving forward until line detected.")
+        while not self.is_line_detected():
+            self.publish_velocity_command(self.straight_intersection_linear_vel, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 3. Line detected - re-enable all processing
+        self.get_logger().info("Line detected, resuming all processing.")
+        self.process_color_blob = True
+        self.process_signs = True
+        
+        self.crossing_intersection = False
+        self.get_logger().info("STRAIGHT intersection crossing complete.")
 
     def execute_right_intersection(self):
         """Execute right turn intersection."""
         self.crossing_intersection = True
         self.get_logger().info("Starting RIGHT intersection crossing.")
         
-        try:
-            # Disable ALL processing including line detection
-            self.process_color_blob = False
-            self.process_signs = False
-            self.process_line_detection = False
-            
-            # Phase 1: Forward
-            self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while (self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration 
-                   and not self.shutdown_requested):
-                if not self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0):
-                    break
-            
-            # Phase 2: Rotate right
-            if not self.shutdown_requested:
-                self.get_logger().info(f"Phase 2: Rotate right {self.turn_rotation_angle} rad.")
-                start_time = self.get_clock().now().nanoseconds * 1e-9
-                while (self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration 
-                       and not self.shutdown_requested):
-                    if not self.spin_with_velocity(0.0, -self.turn_intersection_angular_vel):
-                        break
-            
-            # Phase 3: Re-enable line detection and move forward until line
-            if not self.shutdown_requested:
-                self.get_logger().info("Phase 3: Forward until line detected.")
-                self.process_line_detection = True
-                while not self.is_line_detected() and not self.shutdown_requested:
-                    if not self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0):
-                        break
-                
-                if not self.shutdown_requested:
-                    self.get_logger().info("Line detected, right turn complete.")
-                
-        except Exception as e:
-            self.get_logger().error(f"Error during right intersection: {e}")
-        finally:
-            # Re-enable all processing
-            self.process_color_blob = True
-            self.process_signs = True
-            self.process_line_detection = True
-            self.crossing_intersection = False
-            self.get_logger().info("RIGHT intersection crossing complete.")
+        # 1. Disable ALL processing including line detection
+        self.process_color_blob = False
+        self.process_signs = False
+        self.process_line_detection = False
+        
+        # 2. Forward phase
+        self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
+        start_time = self.get_clock().now().nanoseconds * 1e-9
+        while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
+            self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 3. Rotation phase (negative angular for right)
+        self.get_logger().info(f"Phase 2: Rotate right {self.turn_rotation_angle} rad.")
+        start_time = self.get_clock().now().nanoseconds * 1e-9
+        while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
+            self.publish_velocity_command(0.0, -self.turn_intersection_angular_vel)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 4. Re-enable line detection and move forward until line
+        self.get_logger().info("Phase 3: Forward until line detected.")
+        self.process_line_detection = True
+        
+        # Wait a bit for line detection to update
+        time.sleep(0.1)
+        
+        while not self.is_line_detected():
+            self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 5. Line detected - re-enable all processing
+        self.get_logger().info("Line detected, resuming all processing.")
+        self.process_color_blob = True
+        self.process_signs = True
+        
+        self.crossing_intersection = False
+        self.get_logger().info("RIGHT intersection crossing complete.")
 
     def execute_left_intersection(self):
         """Execute left turn intersection."""
         self.crossing_intersection = True
         self.get_logger().info("Starting LEFT intersection crossing.")
         
-        try:
-            # Disable ALL processing including line detection
-            self.process_color_blob = False
-            self.process_signs = False
-            self.process_line_detection = False
-            
-            # Phase 1: Forward
-            self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while (self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration 
-                   and not self.shutdown_requested):
-                if not self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0):
-                    break
-            
-            # Phase 2: Rotate left
-            if not self.shutdown_requested:
-                self.get_logger().info(f"Phase 2: Rotate left {self.turn_rotation_angle} rad.")
-                start_time = self.get_clock().now().nanoseconds * 1e-9
-                while (self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration 
-                       and not self.shutdown_requested):
-                    if not self.spin_with_velocity(0.0, self.turn_intersection_angular_vel):
-                        break
-            
-            # Phase 3: Re-enable line detection and move forward until line
-            if not self.shutdown_requested:
-                self.get_logger().info("Phase 3: Forward until line detected.")
-                self.process_line_detection = True
-                while not self.is_line_detected() and not self.shutdown_requested:
-                    if not self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0):
-                        break
-                
-                if not self.shutdown_requested:
-                    self.get_logger().info("Line detected, left turn complete.")
-                
-        except Exception as e:
-            self.get_logger().error(f"Error during left intersection: {e}")
-        finally:
-            # Re-enable all processing
-            self.process_color_blob = True
-            self.process_signs = True
-            self.process_line_detection = True
-            self.crossing_intersection = False
-            self.get_logger().info("LEFT intersection crossing complete.")
+        # 1. Disable ALL processing including line detection
+        self.process_color_blob = False
+        self.process_signs = False
+        self.process_line_detection = False
+        
+        # 2. Forward phase
+        self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
+        start_time = self.get_clock().now().nanoseconds * 1e-9
+        while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
+            self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 3. Rotation phase (positive angular for left)
+        self.get_logger().info(f"Phase 2: Rotate left {self.turn_rotation_angle} rad.")
+        start_time = self.get_clock().now().nanoseconds * 1e-9
+        while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
+            self.publish_velocity_command(0.0, self.turn_intersection_angular_vel)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 4. Re-enable line detection and move forward until line
+        self.get_logger().info("Phase 3: Forward until line detected.")
+        self.process_line_detection = True
+        
+        # Wait a bit for line detection to update
+        time.sleep(0.1)
+        
+        while not self.is_line_detected():
+            self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.01)
+        
+        # 5. Line detected - re-enable all processing
+        self.get_logger().info("Line detected, resuming all processing.")
+        self.process_color_blob = True
+        self.process_signs = True
+        
+        self.crossing_intersection = False
+        self.get_logger().info("LEFT intersection crossing complete.")
 
     def fsm_update_loop(self) -> None:
         """Main FSM update loop."""
-        if not self.shutdown_requested:
-            # Update line detection status
-            self.check_line_status()
-            
-            # Determine and execute action
-            action = self.determine_action()
-            self.execute_action(action)
+        # Determine and execute action
+        action = self.determine_action()
+        self.execute_action(action)
 
+    def _sign_name(self, sign: int) -> str:
+        """Get sign name string."""
+        return {
+            SIGN_NONE: 'NONE',
+            SIGN_AHEAD_ONLY: 'AHEAD_ONLY',
+            SIGN_TURN_RIGHT_AHEAD: 'TURN_RIGHT',
+            SIGN_TURN_LEFT_AHEAD: 'TURN_LEFT',
+            SIGN_ROADWORK_AHEAD: 'ROADWORK',
+            SIGN_STOP: 'STOP',
+            SIGN_GIVE_WAY: 'GIVE_WAY'
+        }.get(sign, 'UNKNOWN')
+    
+    def _light_name(self, light: int) -> str:
+        """Get light color name string."""
+        return {
+            ColorBlobDetection.COLOR_NONE: 'NONE',
+            ColorBlobDetection.COLOR_RED: 'RED',
+            ColorBlobDetection.COLOR_YELLOW: 'YELLOW',
+            ColorBlobDetection.COLOR_GREEN: 'GREEN'
+        }.get(light, 'UNKNOWN')
+        
     def destroy_node(self):
         """Override destroy_node to handle cleanup."""
         self.shutdown_requested = True
