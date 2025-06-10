@@ -18,59 +18,34 @@ class LineFollowController(Node):
     Line following controller that maintains constant linear velocity and adjusts 
     angular velocity based on line detection error to keep the robot centered on the lane.
 
-    Subscribes to:
-        - centroid_error (std_msgs/Float32): Normalized line centroid error (-1.0 to 1.0)
-
-    Publishes to:
-      - cmd_vel (geometry_msgs/Twist): Commanded linear and angular velocity
-
-    Service Clients:
-      - line_detection/is_line_detected (std_srvs/Trigger): Checks if line is detected
-
-    Service Servers:
-      - line_follow_controller/controller_on (std_srvs/SetBool): Enable/disable controller
-
-    Control logic:
-      - If controller_on is False: stops the robot (V=0, Omega=0)
-      - If line is not detected: stops the robot (V=0, Omega=0)
-      - If controller_on is True AND line is detected: maintains constant forward velocity and PID steering
+    TIMER CONTROL: When disabled via service, timer is cancelled to prevent cmd_vel conflicts.
     """
     
     def __init__(self):
         super().__init__('line_follow_controller')
-        
+        self.timer = None
         # Declare parameters
         self.declare_parameter('update_rate', 30.0)
-
         self.declare_parameter('linear_velocity', 0.07)
-
         self.declare_parameter('Kp_Omega', 0.35)
         self.declare_parameter('Ki_Omega', 0.1)
         self.declare_parameter('Kd_Omega', 0.1)
-
         self.declare_parameter('max_angular_speed', 1.5)
-
         self.declare_parameter('velocity_scale_factor', 1.0)
-
         self.declare_parameter('steering_deadband', 0.03)
     
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
-
         self.linear_velocity = self.get_parameter('linear_velocity').value
-
         self.Kp_Omega = self.get_parameter('Kp_Omega').value
         self.Ki_Omega = self.get_parameter('Ki_Omega').value
         self.Kd_Omega = self.get_parameter('Kd_Omega').value
-
         self.max_angular_speed = self.get_parameter('max_angular_speed').value
-        
         self.velocity_scale_factor = self.get_parameter('velocity_scale_factor').value
         self.steering_deadband = self.get_parameter('steering_deadband').value
         
-        # Timer for periodic processing
-        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
-
+        self.start_timer()
+        
         # Register the parameter callback
         self.add_on_set_parameters_callback(self.parameter_callback)
 
@@ -86,10 +61,9 @@ class LineFollowController(Node):
             Parameter('steering_deadband', Parameter.Type.DOUBLE, self.steering_deadband),
         ]
 
-        result: SetParametersResult = self.parameter_callback(init_params)
-        if not result.successful:
-            raise RuntimeError(f"Parameter validation failed: {result.reason}")
-
+        # Controller state variables - INITIALIZE FIRST
+        self.controller_enabled = True
+        
         # Cached line detection status
         self.line_detected_cached = False
         self.last_line_status_check = 0.0
@@ -97,11 +71,14 @@ class LineFollowController(Node):
         
         # Controller state variables
         self.line_error = 0.0
-        self.controller_enabled = True
         
         # PID state
         self.integral_error = 0.0
         self.last_error = 0.0
+
+        result: SetParametersResult = self.parameter_callback(init_params)
+        if not result.successful:
+            raise RuntimeError(f"Parameter validation failed: {result.reason}")
 
         # Publishers
         self.cmd_pub = self.create_publisher(
@@ -131,14 +108,36 @@ class LineFollowController(Node):
             'line_detection/is_line_detected'
         )
 
+        # Start timer (controller enabled by default) - LAST
+
         self.get_logger().info("LineFollowController Start.")
+    
+    def start_timer(self):
+        """Start the control timer."""
+        if self.timer is not None:
+            self.timer.cancel()
+        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+        self.get_logger().info("Control timer started.")
+    
+    def stop_timer(self):
+        """Stop the control timer and send stop command."""
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None
+        
+        # Send final stop command
+        cmd = Twist()
+        cmd.linear.x = 0.0
+        cmd.angular.z = 0.0
+        self.cmd_pub.publish(cmd)
+        self.get_logger().info("Control timer stopped, robot stopped.")
     
     def error_callback(self, msg):
         """Update line error from centroid detection."""
         self.line_error = msg.data
         
     def controller_on_callback(self, request, response):
-        """Enable/disable controller service callback."""
+        """Enable/disable controller service callback with timer control."""
         old_state = self.controller_enabled
         self.controller_enabled = request.data
         response.success = True
@@ -146,12 +145,14 @@ class LineFollowController(Node):
         if old_state != self.controller_enabled:
             if self.controller_enabled:
                 response.message = "Controller enabled."
+                self.start_timer()  # Start timer when enabled
                 self.get_logger().info("Controller enabled via service.")
             else:
                 response.message = "Controller disabled."
                 # Reset PID state when disabling
                 self.integral_error = 0.0
                 self.last_error = 0.0
+                self.stop_timer()  # Stop timer when disabled
                 self.get_logger().info("Controller disabled via service.")
         else:
             response.message = f"Controller already {'enabled' if self.controller_enabled else 'disabled'}."
@@ -195,7 +196,7 @@ class LineFollowController(Node):
             self.get_logger().warn(f"Error processing line detection service response: {e}")
 
     def control_loop(self):
-        """Main control loop with cached line detection."""
+        """Main control loop - only runs when controller is enabled."""
         # Check line status asynchronously
         self.check_line_status_async()
         
@@ -205,18 +206,14 @@ class LineFollowController(Node):
         # Create command message
         cmd = Twist()
         
-        # Check if controller is enabled and line is detected
-        if not self.controller_enabled:
-            cmd.linear.x = 0.0
-            cmd.angular.z = 0.0
-            status = "CONTROLLER_DISABLED."
-        elif not self.line_detected_cached:
-            cmd.linear.x = 0.0
-            cmd.angular.z = 0.0
+        # Check if line is detected
+        if not self.line_detected_cached:
             status = "NO_LINE_DETECTED."
             # Reset PID when line is lost
             self.integral_error = 0.0
             self.last_error = 0.0
+            cmd.linear.x = 0.0
+            cmd.angular.z = 0.0
         else:
             # Line detected and controller enabled - do PID control
             error = self.line_error
@@ -249,7 +246,7 @@ class LineFollowController(Node):
             cmd.angular.z = angular_vel * self.velocity_scale_factor
             status = "ACTIVE"
 
-        # Publish commands
+        # Publish commands (only when timer is active)
         self.cmd_pub.publish(cmd)
 
         # Log periodically using ROS 2 throttle
@@ -268,10 +265,9 @@ class LineFollowController(Node):
                         reason="update_rate must be > 0."
                     )
                 self.update_rate = float(param.value)
-                # Recreate timer with new rate
-                if hasattr(self, 'timer') and self.timer is not None:
-                    self.timer.cancel()
-                    self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+                # Recreate timer with new rate if controller is enabled
+                if self.controller_enabled:
+                    self.start_timer()
                 self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
             elif param.name == 'linear_velocity':
