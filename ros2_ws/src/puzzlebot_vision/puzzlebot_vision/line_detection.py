@@ -51,14 +51,10 @@ class LineDectection(Node):
         
         # Centroid calculation parameters
         self.declare_parameter('min_contour_area', 180)
-        self.declare_parameter('max_contour_area', 50000)
+        self.declare_parameter('max_contour_area', 500000)
         
         # Filtering parameters
         self.declare_parameter('filter_alpha', 0.1)
-
-        # Line continuity detection parameters
-        self.declare_parameter('min_line_continuity_area', 7500) 
-        self.declare_parameter('min_line_height', 100)  
         
         # Retrieve parameters
         self.image_topic = self.get_parameter('image_topic').value
@@ -90,9 +86,6 @@ class LineDectection(Node):
         self.max_contour_area = self.get_parameter('max_contour_area').value
 
         self.filter_alpha = self.get_parameter('filter_alpha').value
-        
-        self.min_line_continuity_area = self.get_parameter('min_line_continuity_area').value
-        self.min_line_height = self.get_parameter('min_line_height').value
 
         # Timer for periodic processing
         self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
@@ -129,8 +122,6 @@ class LineDectection(Node):
             Parameter('min_contour_area',           Parameter.Type.INTEGER, self.min_contour_area),
             Parameter('max_contour_area',           Parameter.Type.INTEGER, self.max_contour_area),
             Parameter('filter_alpha',               Parameter.Type.DOUBLE,  self.filter_alpha),
-            Parameter('min_line_continuity_area',   Parameter.Type.INTEGER, self.min_line_continuity_area),
-            Parameter('min_line_height',            Parameter.Type.INTEGER, self.min_line_height),
         ]
 
         result: SetParametersResult = self.parameter_callback(init_params)
@@ -236,8 +227,8 @@ class LineDectection(Node):
 
     def calculate_lane_centroid(self, mask):
         """
-        Calculate the centroid of line contours for IBVS control
-        Returns: (centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line)
+        Simple line detection using pixel distribution analysis
+        Returns: (centroid_x, centroid_y, lane_angle, lane_width, is_valid_line)
         """
         # Find all contours in the binary mask
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -252,26 +243,15 @@ class LineDectection(Node):
         if not valid_contours:
             return None, None, None, None, False
         
-        # Check for continuous line
-        total_valid_area = sum(cv2.contourArea(cnt) for cnt in valid_contours)
-        max_contour_height = 0
+        # Check if this is a crossing using pixel distribution
+        if self.is_crossing(mask):
+            return None, None, None, None, False
         
-        # Check each contour's vertical extent
-        for contour in valid_contours:
-            _, y, _, h = cv2.boundingRect(contour)
-            if h > max_contour_height:
-                max_contour_height = h
-        
-        # Determine if we have a continuous line
-        is_continuous_line = (total_valid_area >= self.min_line_continuity_area and 
-                             max_contour_height >= self.min_line_height)
-        
-        # Calculate moments for all valid contours combined
+        # Calculate weighted centroid of all valid contours
         total_area = 0
         weighted_cx = 0
         weighted_cy = 0
         
-        # Find the largest contours (likely the line markings)
         contour_data = []
         for contour in valid_contours:
             area = cv2.contourArea(contour)
@@ -280,40 +260,61 @@ class LineDectection(Node):
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
                 contour_data.append((contour, area, cx, cy))
+                
+                weighted_cx += cx * area
+                weighted_cy += cy * area
+                total_area += area
         
-        if not contour_data:
-            return None, None, None, None, is_continuous_line
+        if total_area == 0:
+            return None, None, None, None, False
         
-        # Sort by area and take the largest contours
-        contour_data.sort(key=lambda x: x[1], reverse=True)
-        
-        # Calculate overall centroid weighted by area
-        for contour, area, cx, cy in contour_data:
-            weighted_cx += cx * area
-            weighted_cy += cy * area
-            total_area += area
-        
-        if total_area > 0:
-            centroid_x = int(weighted_cx / total_area)
-            centroid_y = int(weighted_cy / total_area)
-        else:
-            return None, None, None, None, is_continuous_line
+        centroid_x = int(weighted_cx / total_area)
+        centroid_y = int(weighted_cy / total_area)
         
         # Calculate line angle using the largest contour
-        largest_contour = contour_data[0][0]
+        if contour_data:
+            largest_contour = max(contour_data, key=lambda x: x[1])[0]
+            if len(largest_contour) >= 5:
+                [vx, vy, x, y] = cv2.fitLine(largest_contour, cv2.DIST_L2, 0, 0.01, 0.01)
+                lane_angle = float(np.arctan2(vy[0], vx[0]) * 180 / np.pi)
+            else:
+                lane_angle = 0.0
+        else:
+            lane_angle = 0.0
         
-        # Fit a line to estimate line direction
-        [vx, vy, x, y] = cv2.fitLine(largest_contour, cv2.DIST_L2, 0, 0.01, 0.01)
-        lane_angle = float(np.arctan2(vy[0], vx[0]) * 180 / np.pi)  # Convert to degrees
-        
-        # Calculate approximate line width (distance between leftmost and rightmost contours)
+        # Calculate approximate line width (span of contours)
         if len(contour_data) >= 2:
             x_positions = [data[2] for data in contour_data]  # cx values
             lane_width = max(x_positions) - min(x_positions)
         else:
             lane_width = 0
         
-        return centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line
+        return centroid_x, centroid_y, lane_angle, lane_width, True
+
+    def is_crossing(self, mask):
+        """
+        Detect if the mask represents a crossing by analyzing pixel distribution.
+        Returns True if more pixels are distributed vertically than horizontally.
+        """
+        height, width = mask.shape
+        
+        # Count white pixels in each row (horizontal distribution)
+        row_counts = np.sum(mask, axis=1)  # Sum across columns for each row
+        
+        # Count white pixels in each column (vertical distribution)  
+        col_counts = np.sum(mask, axis=0)  # Sum across rows for each column
+        
+        # Calculate spread: how many rows/columns have significant pixels
+        # Threshold of at least 10% of max pixels in any single row/column
+        row_threshold = np.max(row_counts) * 0.1 if np.max(row_counts) > 0 else 1
+        col_threshold = np.max(col_counts) * 0.1 if np.max(col_counts) > 0 else 1
+        
+        active_rows = np.sum(row_counts > row_threshold)
+        active_cols = np.sum(col_counts > col_threshold)
+        
+        # If more columns have significant pixels than rows, it's likely a crossing
+        # This means the pattern extends more vertically than horizontally
+        return active_cols > active_rows
 
     def image_callback(self, msg):
         """Callback to convert ROS image to OpenCV format and store it."""
@@ -355,10 +356,10 @@ class LineDectection(Node):
         self.thresholded_pub.publish(thresholded_msg)
         
         # Calculate line centroid and properties
-        centroid_x, centroid_y, lane_angle, lane_width, is_continuous_line = self.calculate_lane_centroid(mask)
+        centroid_x, centroid_y, lane_angle, lane_width, is_valid_line = self.calculate_lane_centroid(mask)
         
         # Update line detection status
-        self.is_line_detected = is_continuous_line
+        self.is_line_detected = is_valid_line
         
         # Create visualization
         result_frame = transformed_frame.copy()
@@ -403,17 +404,17 @@ class LineDectection(Node):
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             cv2.putText(result_frame, f"Width: {lane_width}", (10, 120), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(result_frame, f"Line Detected: {is_continuous_line}", (10, 150), 
+            cv2.putText(result_frame, f"Line Detected: {is_valid_line}", (10, 150), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}, Line Detected: {is_continuous_line}.")     
+            self.get_logger().debug(f"IBVS Centroid Error: {centroid_error:.3f}, Line Detected: {is_valid_line}.")     
         else:
             cv2.putText(result_frame, "No line detected", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.putText(result_frame, f"Line Detected: {is_continuous_line}", (50, 80), 
+            cv2.putText(result_frame, f"Line Detected: {is_valid_line}", (50, 80), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            self.get_logger().debug(f"No line detected, Line Detected: {is_continuous_line}.")
+            self.get_logger().debug(f"No line detected, Line Detected: {is_valid_line}.")
 
         # Draw contours on the result for visualization
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -531,7 +532,7 @@ class LineDectection(Node):
                 self.grayscale_threshold = param.value
                 self.get_logger().info(f"grayscale_threshold updated: {self.grayscale_threshold}.")
 
-            elif param.name in ('min_contour_area', 'max_contour_area', 'min_line_continuity_area', 'min_line_height'):
+            elif param.name in ('min_contour_area', 'max_contour_area'):
                 if not isinstance(param.value, int) or param.value <= 0:
                     return SetParametersResult(
                         successful=False,

@@ -26,12 +26,9 @@ line_detection:
     morph_dilate_iterations: 90
 
     min_contour_area: 180
-    max_contour_area: 50000
+    max_contour_area: 500000
 
     filter_alpha: 0.1
-
-    min_line_continuity_area: 7500
-    min_line_height: 100
 
 line_follow_controller:
   ros__parameters:

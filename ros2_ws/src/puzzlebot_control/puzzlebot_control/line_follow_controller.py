@@ -87,6 +87,16 @@ class LineFollowController(Node):
         self.create_service(Trigger, 'line_follow_controller/resume_timer', self.resume_timer_callback)
         self.timer_active = True
 
+        # Add cached line detection status
+        self.line_detected_cached = False
+        self.last_line_status_check = 0.0
+        self.line_status_check_interval = 0.1  # Check every 100ms
+
+        # Add cached line detection status
+        self.line_detected_cached = False
+        self.last_line_status_check = 0.0
+        self.line_status_check_interval = 0.1  # Check every 100ms
+
         # Validate initial parameters
         init_params = [
             Parameter('update_rate', Parameter.Type.DOUBLE, self.update_rate),
@@ -146,7 +156,7 @@ class LineFollowController(Node):
     def resume_timer_callback(self, request, response):
         """Service callback to resume the timer."""
         if self.timer is None and not self.timer_active:
-            self.timer = self.create_timer(1.0 / self.update_rate, self.timer_callback)
+            self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
             self.timer_active = True
             self.get_logger().info('Timer resumed.')
             response.success = True
@@ -162,46 +172,74 @@ class LineFollowController(Node):
         
     def controller_on_callback(self, request, response):
         """Enable/disable controller service callback."""
+        old_state = self.controller_enabled
         self.controller_enabled = request.data
         response.success = True
         
-        if self.controller_enabled:
-            response.message = "Controller enabled."
-            self.get_logger().info("Controller enabled via service.")
+        # Only log when state actually changes
+        if old_state != self.controller_enabled:
+            if self.controller_enabled:
+                response.message = "Controller enabled."
+                self.get_logger().info("Controller enabled via service.")
+            else:
+                response.message = "Controller disabled."
+                # Reset PID state when disabling
+                self.integral_error = 0.0
+                self.last_error = 0.0
+                self.get_logger().info("Controller disabled via service.")
         else:
-            response.message = "Controller disabled."
-            # Reset PID state when disabling
-            self.integral_error = 0.0
-            self.last_error = 0.0
-            self.get_logger().info("Controller disabled via service.")
+            # State didn't change
+            if self.controller_enabled:
+                response.message = "Controller already enabled."
+            else:
+                response.message = "Controller already disabled."
             
         return response
 
-    def is_line_detected(self):
-        """Check if line is detected via service call."""
+    def check_line_status_async(self):
+        """Asynchronously check line detection status and cache result."""
+        current_time = self.get_clock().now().nanoseconds / 1e9
+        
+        # Only check periodically to avoid overwhelming the service
+        if current_time - self.last_line_status_check < self.line_status_check_interval:
+            return
+            
+        self.last_line_status_check = current_time
+        
         if not self.line_status_client.service_is_ready():
-            self.get_logger().warn("Line detection service not available.")
-            return False
+            self.get_logger().warn("Line detection service not ready.", throttle_duration_sec=2.0)
+            return
             
         try:
             request = Trigger.Request()
             future = self.line_status_client.call_async(request)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=0.1)
-            
-            if future.result() is not None:
-                return future.result().success
-            else:
-                self.get_logger().warn("Line detection service call failed.")
-                return False
+            future.add_done_callback(self.line_status_callback)
         except Exception as e:
-            self.get_logger().warn(f"Error calling line detection service: {e}")
-            return False
-    
+            self.get_logger().warn(f"Error initiating line detection service call: {e}")
+
+    def line_status_callback(self, future):
+        """Callback for line detection status service response."""
+        try:
+            result = future.result()
+            if result is not None:
+                old_status = self.line_detected_cached
+                self.line_detected_cached = result.success
+                
+                # Log status changes
+                if old_status != self.line_detected_cached:
+                    self.get_logger().info(f"Line detection status changed: {self.line_detected_cached} ('{result.message}').")
+                    
+        except Exception as e:
+            self.get_logger().warn(f"Error processing line detection service response: {e}")
+
     def control_loop(self):
-        """Main control loop."""
+        """Main control loop with cached line detection."""
         if not self.timer_active:
             return
     
+        # Check line status asynchronously
+        self.check_line_status_async()
+        
         # Calculate dt based on update rate
         dt = 1.0 / self.update_rate
         
@@ -214,10 +252,8 @@ class LineFollowController(Node):
             cmd.angular.z = 0.0
             status = "CONTROLLER_DISABLED"
         else:
-            # Check if line is detected
-            line_detected = self.is_line_detected()
-            
-            if not line_detected:
+            # Use cached line detection status
+            if not self.line_detected_cached:
                 cmd.linear.x = 0.0
                 cmd.angular.z = 0.0
                 status = "NO_LINE_DETECTED"
@@ -261,51 +297,63 @@ class LineFollowController(Node):
         self.angular_cmd_pub.publish(Float32(data=cmd.angular.z))
 
         # Log periodically using ROS 2 throttle
-        self.get_logger().info(f"Status: {status}, V={cmd.linear.x:.3f}, Ω={cmd.angular.z:.3f}", 
+        self.get_logger().info(f"Status: {status}, V={cmd.linear.x:.3f}, Ω={cmd.angular.z:.3f}, LineDetected: {self.line_detected_cached}", 
                               throttle_duration_sec=1.0)
 
-    def parameter_callback(self, params):
-        """Validate and update parameters."""
-        for param in params:
-            if param.name == 'update_rate':
-                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
-                    return SetParametersResult(
-                        successful=False,
-                        reason="update_rate must be > 0."
-                    )
-                self.update_rate = float(param.value)
-                # Only cancel timer if it exists and is active
-                if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
-                    self.timer.cancel()
-                    self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
-                self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
+    def parameter_callback(self, params: list[Parameter]) -> SetParametersResult:
+            """Validates and applies updated node parameters."""
+            
+            for param in params:
+                if param.name == 'update_rate':
+                    if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                        return SetParametersResult(
+                            successful=False,
+                            reason="update_rate must be > 0."
+                        )
+                    self.update_rate = float(param.value)
+                    # Only cancel timer if it exists and is active
+                    if hasattr(self, 'timer') and self.timer is not None and self.timer_active:
+                        self.timer.cancel()
+                        self.timer = self.create_timer(1.0 / self.update_rate, self.control_loop)
+                    self.get_logger().info(f"update_rate updated: {self.update_rate} Hz.")
 
-            elif param.name == 'linear_velocity':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(successful=False, reason="linear_velocity must be >= 0.")
-                self.linear_velocity = float(param.value)
+                elif param.name == 'linear_velocity':
+                    if not isinstance(param.value, (int, float)):
+                        return SetParametersResult(
+                            successful=False,
+                            reason="linear_velocity must be a number."
+                        )
+                    self.linear_velocity = float(param.value)
+                    self.get_logger().info(f"linear_velocity updated: {self.linear_velocity}.")
 
-            elif param.name in ('Kp_Omega', 'Ki_Omega', 'Kd_Omega'):
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(successful=False, reason=f"{param.name} must be >= 0.")
-                setattr(self, param.name, float(param.value))
+                elif param.name in ('Kp_Omega', 'Ki_Omega', 'Kd_Omega'):
+                    if not isinstance(param.value, (int, float)):
+                        return SetParametersResult(
+                            successful=False,
+                            reason=f"{param.name} must be a number."
+                        )
+                    setattr(self, param.name, float(param.value))
+                    self.get_logger().info(f"{param.name} updated: {param.value}.")
 
-            elif param.name == 'max_angular_speed':
-                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
-                    return SetParametersResult(successful=False, reason="max_angular_speed must be > 0.")
-                self.max_angular_speed = float(param.value)
+                elif param.name == 'max_angular_speed':
+                    if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                        return SetParametersResult(
+                            successful=False,
+                            reason="max_angular_speed must be > 0."
+                        )
+                    self.max_angular_speed = float(param.value)
+                    self.get_logger().info(f"max_angular_speed updated: {self.max_angular_speed}.")
 
-            elif param.name == 'velocity_scale_factor':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(successful=False, reason="velocity_scale_factor must be >= 0.")
-                self.velocity_scale_factor = float(param.value)
+                elif param.name in ('velocity_scale_factor', 'steering_deadband'):
+                    if not isinstance(param.value, (int, float)) or param.value < 0.0:
+                        return SetParametersResult(
+                            successful=False,
+                            reason=f"{param.name} must be >= 0."
+                        )
+                    setattr(self, param.name, float(param.value))
+                    self.get_logger().info(f"{param.name} updated: {param.value}.")
 
-            elif param.name == 'steering_deadband':
-                if not isinstance(param.value, (int, float)) or param.value < 0.0:
-                    return SetParametersResult(successful=False, reason="steering_deadband must be >= 0.")
-                self.steering_deadband = float(param.value)
-
-        return SetParametersResult(successful=True)
+            return SetParametersResult(successful=True)
 
 def main(args=None):
     rclpy.init(args=args)

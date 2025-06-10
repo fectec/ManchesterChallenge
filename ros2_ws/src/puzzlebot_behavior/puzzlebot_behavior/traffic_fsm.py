@@ -147,8 +147,14 @@ class TrafficFSM(Node):
         self.light_lost_time = None
         self.sign_lost_time = None
         
-        # Controller state
+        # Controller state tracking
+        self.controller_enabled = None          # Track current controller state
         self.current_velocity_scale = None
+        
+        # Cached line detection status
+        self.line_detected_cached = False
+        self.last_line_status_check = 0.0
+        self.line_status_check_interval = 0.1   # Check every 100ms
         
         # Flag to prevent detection updates during intersection
         self.crossing_intersection = False
@@ -256,24 +262,49 @@ class TrafficFSM(Node):
                     self.last_directional_sign = self.current_sign
             self.current_sign = SIGN_NONE
 
-    def is_line_detected(self) -> bool:
-        """Check if line is detected via service call."""
+    def check_line_status_async(self):
+        """Asynchronously check line detection status and cache result."""
+        current_time = self.get_clock().now().nanoseconds / 1e9
+        
+        # Only check periodically to avoid overwhelming the service
+        if current_time - self.last_line_status_check < self.line_status_check_interval:
+            return
+            
+        self.last_line_status_check = current_time
+        
         if not self.line_status_client.service_is_ready():
-            self.get_logger().warn("Line detection service not available.", throttle_duration_sec=5.0)
-            return False
+            self.get_logger().warn("Line detection service not ready.", throttle_duration_sec=2.0)
+            return
             
         try:
             request = Trigger.Request()
             future = self.line_status_client.call_async(request)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=0.05)
-            
-            if future.result() is not None:
-                return future.result().success
-            else:
-                return False
+            future.add_done_callback(self.line_status_callback)
         except Exception as e:
-            self.get_logger().warn(f"Error calling line detection service: {e}", throttle_duration_sec=5.0)
-            return False
+            self.get_logger().warn(f"Error initiating line detection service call: {e}")
+
+    def line_status_callback(self, future):
+        """Callback for line detection status service response."""
+        try:
+            result = future.result()
+            if result is not None:
+                old_status = self.line_detected_cached
+                self.line_detected_cached = result.success
+                
+                # Log status changes
+                if old_status != self.line_detected_cached:
+                    self.get_logger().info(f"Line detection status changed: {self.line_detected_cached} ('{result.message}').")
+                    
+        except Exception as e:
+            self.get_logger().warn(f"Error processing line detection service response: {e}")
+
+    def is_line_detected(self) -> bool:
+        """Check if line is detected using cached status."""
+        # Update cache asynchronously
+        self.check_line_status_async()
+        
+        # Return cached value
+        return self.line_detected_cached
         
     def call_controller_on(self, enable: bool) -> None:
         """Enable/disable line controller via service."""
@@ -314,7 +345,7 @@ class TrafficFSM(Node):
 
     def determine_action(self) -> int:
         """Determine action based on current state."""
-        # Get line detection status
+        # Get line detection status (cached)
         line_detected = self.is_line_detected()
         
         # Stop sign or red light
@@ -344,14 +375,21 @@ class TrafficFSM(Node):
     def execute_action(self, action: int) -> None:
         """Execute the determined action."""
         if action in [ACTION_FULL_SPEED, ACTION_MID_SPEED]:
-            self.call_controller_on(True)
+            # Only enable controller if it's not already enabled
+            if self.controller_enabled != True:
+                self.call_controller_on(True)
+                self.controller_enabled = True
+                
             new_scale = self.full_speed_scale if action == ACTION_FULL_SPEED else self.mid_speed_scale
             if self.current_velocity_scale != new_scale:
                 self.update_controller_param("velocity_scale_factor", new_scale)
                 self.current_velocity_scale = new_scale
             
         elif action == ACTION_ZERO_SPEED:
-            self.call_controller_on(False)
+            # Only disable controller if it's not already disabled
+            if self.controller_enabled != False:
+                self.call_controller_on(False)
+                self.controller_enabled = False
             self.current_velocity_scale = None
             
         elif action == ACTION_STRAIGHT_INTERSECTION:
@@ -551,13 +589,11 @@ class TrafficFSM(Node):
 
             elif param.name == 'controller_on_service':
                 self.controller_on_service = param.value
-                # Recreate client with new service name
                 self.controller_on_client = self.create_client(SetBool, self.controller_on_service)
                 self.get_logger().info(f"controller_on_service updated: {self.controller_on_service}.")
 
             elif param.name == 'controller_parameter_service':
                 self.controller_parameter_service = param.value
-                # Recreate client with new service name
                 self.controller_param_client = self.create_client(SetParameters, self.controller_parameter_service)
                 self.get_logger().info(f"controller_parameter_service updated: {self.controller_parameter_service}.")
                 
@@ -571,25 +607,21 @@ class TrafficFSM(Node):
                 
             elif param.name == 'turn_intersection_linear_vel':
                 self.turn_intersection_linear_vel = float(param.value)
-                # Recalculate duration
                 self.turn_forward_duration = self.turn_forward_distance / self.turn_intersection_linear_vel
                 self.get_logger().info(f"turn_intersection_linear_vel updated: {self.turn_intersection_linear_vel} m/s.")
                 
             elif param.name == 'turn_intersection_angular_vel':
                 self.turn_intersection_angular_vel = float(param.value)
-                # Recalculate duration
                 self.turn_rotation_duration = abs(self.turn_rotation_angle) / self.turn_intersection_angular_vel
                 self.get_logger().info(f"turn_intersection_angular_vel updated: {self.turn_intersection_angular_vel} rad/s.")
                 
             elif param.name == 'turn_forward_distance':
                 self.turn_forward_distance = float(param.value)
-                # Recalculate duration
                 self.turn_forward_duration = self.turn_forward_distance / self.turn_intersection_linear_vel
                 self.get_logger().info(f"turn_forward_distance updated: {self.turn_forward_distance} m.")
                 
             elif param.name == 'turn_rotation_angle':
                 self.turn_rotation_angle = float(param.value)
-                # Recalculate duration
                 self.turn_rotation_duration = abs(self.turn_rotation_angle) / self.turn_intersection_angular_vel
                 self.get_logger().info(f"turn_rotation_angle updated: {self.turn_rotation_angle} rad.")
 

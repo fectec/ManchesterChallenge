@@ -53,7 +53,7 @@ color_blob_detection:
     morph_erode_iterations: 10
     morph_dilate_iterations: 8
 
-yolov8_detection:
+yolov8_recognition:
   ros__parameters:
     image_topic: 'image_raw'
     use_compressed: True
@@ -87,15 +87,12 @@ line_detection:
     grayscale_threshold: 95
     morph_kernel_size: 3
     morph_erode_iterations: 40
-    morph_dilate_iterations: 90
+    morph_dilate_iterations: 40
 
     min_contour_area: 180
-    max_contour_area: 50000
+    max_contour_area: 500000
 
     filter_alpha: 0.1
-
-    min_line_continuity_area: 7500
-    min_line_height: 100
 
 line_follow_controller:
   ros__parameters:
@@ -121,9 +118,9 @@ traffic_fsm:
     full_speed_scale: 1.0
     mid_speed_scale: 0.6
 
-    pid_toggle_service: 'line_follow_controller/controller_on'
-    pid_parameter_service: 'line_follow_controller/set_parameters'
-    
+    controller_on_service: 'line_follow_controller/controller_on'        
+    controller_parameter_service: 'line_follow_controller/set_parameters'
+
     stop_sign_min_area: 0.1
 
     straight_intersection_linear_vel: 0.06
