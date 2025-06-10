@@ -1,7 +1,7 @@
 color_blob_detection:
   ros__parameters:
     image_topic: 'image_raw'
-    use_compressed: False
+    use_compressed: True
 
     update_rate: 30.0
     
