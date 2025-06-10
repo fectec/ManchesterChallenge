@@ -126,9 +126,9 @@ traffic_fsm:
     straight_intersection_linear_vel: 0.06
 
     turn_intersection_linear_vel: 0.06
-    turn_intersection_angular_vel: 0.8
+    turn_intersection_angular_vel: 1.0
 
-    turn_forward_distance:  0.3
+    turn_forward_distance:  0.35
     turn_rotation_angle: 1.57
 
     image_width: 640

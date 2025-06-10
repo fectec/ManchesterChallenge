@@ -159,6 +159,14 @@ class TrafficFSM(Node):
         # Flag to prevent detection updates during intersection
         self.crossing_intersection = False
         
+        # NODE STATE MANAGEMENT FLAGS
+        self.nodes_paused_state = {
+            'color_blob': False,
+            'yolo': False,
+            'line_controller': False,
+            'line_detection': False
+        }
+        
         # Publisher for velocity commands
         self.cmd_vel_pub = self.create_publisher(
             Twist, 
@@ -320,15 +328,45 @@ class TrafficFSM(Node):
             req.parameters = [Parameter(param_name, Parameter.Type.DOUBLE, value).to_parameter_msg()]
             self.controller_param_client.call_async(req)
 
-    def pause_node(self, node_name: str) -> None:
-        """Pause a node's timer."""
-        if node_name in self.pause_clients and self.pause_clients[node_name].service_is_ready():
-            self.pause_clients[node_name].call_async(Trigger.Request())
+    def pause_node_safe(self, node_name: str) -> None:
+        """Safely pause a node's timer (only if not already paused)."""
+        if not self.nodes_paused_state.get(node_name, False):
+            if node_name in self.pause_clients and self.pause_clients[node_name].service_is_ready():
+                self.pause_clients[node_name].call_async(Trigger.Request())
+                self.nodes_paused_state[node_name] = True
+                self.get_logger().info(f"Paused node: {node_name}")
+            else:
+                self.get_logger().warn(f"Cannot pause {node_name}: service not ready")
 
-    def resume_node(self, node_name: str) -> None:
-        """Resume a node's timer."""
-        if node_name in self.resume_clients and self.resume_clients[node_name].service_is_ready():
-            self.resume_clients[node_name].call_async(Trigger.Request())
+    def resume_node_safe(self, node_name: str) -> None:
+        """Safely resume a node's timer (only if currently paused)."""
+        if self.nodes_paused_state.get(node_name, False):
+            if node_name in self.resume_clients and self.resume_clients[node_name].service_is_ready():
+                self.resume_clients[node_name].call_async(Trigger.Request())
+                self.nodes_paused_state[node_name] = False
+                self.get_logger().info(f"Resumed node: {node_name}")
+            else:
+                self.get_logger().warn(f"Cannot resume {node_name}: service not ready")
+
+    def pause_detection_nodes(self) -> None:
+        """Pause detection nodes for intersection crossing."""
+        self.pause_node_safe('color_blob')
+        self.pause_node_safe('yolo')
+        self.pause_node_safe('line_controller')
+
+    def pause_all_nodes(self) -> None:
+        """Pause all nodes including line detection."""
+        self.pause_node_safe('color_blob')
+        self.pause_node_safe('yolo')
+        self.pause_node_safe('line_controller')
+        self.pause_node_safe('line_detection')
+
+    def resume_all_nodes(self) -> None:
+        """Resume all paused nodes."""
+        self.resume_node_safe('color_blob')
+        self.resume_node_safe('yolo')
+        self.resume_node_safe('line_controller')
+        self.resume_node_safe('line_detection')
 
     def publish_velocity_command(self, linear: float, angular: float) -> None:
         """Publish velocity command."""
@@ -337,11 +375,10 @@ class TrafficFSM(Node):
         twist.angular.z = angular
         self.cmd_vel_pub.publish(twist)
 
-    def wait_seconds(self, seconds: float) -> None:
-        """Wait for specified seconds while still publishing velocity."""
-        start_time = self.get_clock().now().nanoseconds * 1e-9
-        while self.get_clock().now().nanoseconds * 1e-9 - start_time < seconds:
-            rclpy.spin_once(self, timeout_sec=0.01)
+    def spin_with_velocity(self, linear: float, angular: float) -> None:
+        """Spin once while publishing velocity commands."""
+        self.publish_velocity_command(linear, angular)
+        rclpy.spin_once(self, timeout_sec=0.01)
 
     def determine_action(self) -> int:
         """Determine action based on current state."""
@@ -397,107 +434,95 @@ class TrafficFSM(Node):
             self.crossing_intersection = True
             self.get_logger().info("Starting STRAIGHT intersection crossing.")
             
-            # 1. Pause nodes: color_blob, yolo, line_controller (NOT line_detection)
-            self.pause_node('color_blob')
-            self.pause_node('yolo')
-            self.pause_node('line_controller')
-            
-            # 2. Move forward until line detected
-            self.get_logger().info("Moving forward until line detected.")
-            while not self.is_line_detected():
-                self.publish_velocity_command(self.straight_intersection_linear_vel, 0.0)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 3. Line detected - resume all nodes
-            self.get_logger().info("Line detected, resuming nodes.")
-            self.resume_node('color_blob')
-            self.resume_node('yolo')
-            self.resume_node('line_controller')
-            
-            self.crossing_intersection = False
-            self.get_logger().info("STRAIGHT intersection crossing complete.")
+            try:
+                # 1. Pause detection nodes (not line_detection for straight)
+                self.pause_detection_nodes()
+                
+                # 2. Move forward until line detected
+                self.get_logger().info("Moving forward until line detected.")
+                while not self.is_line_detected():
+                    self.spin_with_velocity(self.straight_intersection_linear_vel, 0.0)
+                
+                # 3. Line detected - we're done
+                self.get_logger().info("Line detected, straight intersection complete.")
+                
+            finally:
+                # Always resume all nodes and reset crossing flag
+                self.resume_all_nodes()
+                self.crossing_intersection = False
+                self.get_logger().info("STRAIGHT intersection crossing complete.")
             
         elif action == ACTION_RIGHT_INTERSECTION:
             # COMPLETE RIGHT INTERSECTION ROUTINE
             self.crossing_intersection = True
             self.get_logger().info("Starting RIGHT intersection crossing.")
             
-            # 1. Pause ALL nodes including line_detection
-            self.pause_node('color_blob')
-            self.pause_node('yolo')
-            self.pause_node('line_controller')
-            self.pause_node('line_detection')
-            
-            # 2. Forward phase
-            self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
-                self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 3. Rotation phase (negative angular for right)
-            self.get_logger().info(f"Phase 2: Rotate right {self.turn_rotation_angle} rad.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
-                self.publish_velocity_command(0.0, -self.turn_intersection_angular_vel)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 4. Resume line detection and move forward until line
-            self.get_logger().info("Phase 3: Forward until line detected.")
-            self.resume_node('line_detection')
-            while not self.is_line_detected():
-                self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 5. Line detected - resume all nodes
-            self.get_logger().info("Line detected, resuming all nodes.")
-            self.resume_node('color_blob')
-            self.resume_node('yolo')
-            self.resume_node('line_controller')
-            
-            self.crossing_intersection = False
-            self.get_logger().info("RIGHT intersection crossing complete.")
+            try:
+                # 1. Pause ALL nodes including line_detection
+                self.pause_all_nodes()
+                
+                # 2. Forward phase
+                self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
+                start_time = self.get_clock().now().nanoseconds * 1e-9
+                while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
+                    self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0)
+                
+                # 3. Rotation phase (negative angular for right)
+                self.get_logger().info(f"Phase 2: Rotate right {self.turn_rotation_angle} rad.")
+                start_time = self.get_clock().now().nanoseconds * 1e-9
+                while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
+                    self.spin_with_velocity(0.0, -self.turn_intersection_angular_vel)
+                
+                # 4. Resume line detection and move forward until line
+                self.get_logger().info("Phase 3: Forward until line detected.")
+                self.resume_node_safe('line_detection')
+                while not self.is_line_detected():
+                    self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0)
+                
+                # 5. Line detected
+                self.get_logger().info("Line detected, right turn complete.")
+                
+            finally:
+                # Always resume all nodes and reset crossing flag
+                self.resume_all_nodes()
+                self.crossing_intersection = False
+                self.get_logger().info("RIGHT intersection crossing complete.")
             
         elif action == ACTION_LEFT_INTERSECTION:
             # COMPLETE LEFT INTERSECTION ROUTINE
             self.crossing_intersection = True
             self.get_logger().info("Starting LEFT intersection crossing.")
             
-            # 1. Pause ALL nodes including line_detection
-            self.pause_node('color_blob')
-            self.pause_node('yolo')
-            self.pause_node('line_controller')
-            self.pause_node('line_detection')
-            
-            # 2. Forward phase
-            self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
-                self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 3. Rotation phase (positive angular for left)
-            self.get_logger().info(f"Phase 2: Rotate left {self.turn_rotation_angle} rad.")
-            start_time = self.get_clock().now().nanoseconds * 1e-9
-            while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
-                self.publish_velocity_command(0.0, self.turn_intersection_angular_vel)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 4. Resume line detection and move forward until line
-            self.get_logger().info("Phase 3: Forward until line detected.")
-            self.resume_node('line_detection')
-            while not self.is_line_detected():
-                self.publish_velocity_command(self.turn_intersection_linear_vel, 0.0)
-                rclpy.spin_once(self, timeout_sec=0.01)
-            
-            # 5. Line detected - resume all nodes
-            self.get_logger().info("Line detected, resuming all nodes.")
-            self.resume_node('color_blob')
-            self.resume_node('yolo')
-            self.resume_node('line_controller')
-            
-            self.crossing_intersection = False
-            self.get_logger().info("LEFT intersection crossing complete.")
+            try:
+                # 1. Pause ALL nodes including line_detection
+                self.pause_all_nodes()
+                
+                # 2. Forward phase
+                self.get_logger().info(f"Phase 1: Forward {self.turn_forward_distance}m.")
+                start_time = self.get_clock().now().nanoseconds * 1e-9
+                while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_forward_duration:
+                    self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0)
+                
+                # 3. Rotation phase (positive angular for left)
+                self.get_logger().info(f"Phase 2: Rotate left {self.turn_rotation_angle} rad.")
+                start_time = self.get_clock().now().nanoseconds * 1e-9
+                while self.get_clock().now().nanoseconds * 1e-9 - start_time < self.turn_rotation_duration:
+                    self.spin_with_velocity(0.0, self.turn_intersection_angular_vel)
+                
+                # 4. Resume line detection and move forward until line
+                self.get_logger().info("Phase 3: Forward until line detected.")
+                self.resume_node_safe('line_detection')
+                while not self.is_line_detected():
+                    self.spin_with_velocity(self.turn_intersection_linear_vel, 0.0)
+                
+                # 5. Line detected
+                self.get_logger().info("Line detected, left turn complete.")
+                
+            finally:
+                # Always resume all nodes and reset crossing flag
+                self.resume_all_nodes()
+                self.crossing_intersection = False
+                self.get_logger().info("LEFT intersection crossing complete.")
 
     def fsm_update_loop(self) -> None:
         """Main FSM update loop."""
