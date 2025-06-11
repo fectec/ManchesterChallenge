@@ -6,8 +6,8 @@ adaptive_image_filter:
     sampling_interval: 1.0
     adaptation_strength: 1.0
 
-    target_brightness: 55
-    target_contrast: 40
+    target_brightness: 30
+    target_contrast: 50
     target_saturation: 25
 
 color_blob_detection:
@@ -18,15 +18,15 @@ color_blob_detection:
     update_rate: 60.0
     
     hsv_green_h_low: 50
-    hsv_green_s_low: 60
+    hsv_green_s_low: 25
     hsv_green_v_low: 80
     hsv_green_h_high: 70
     hsv_green_s_high: 255
     hsv_green_v_high: 255
     
-    hsv_yellow_h_low: 23
+    hsv_yellow_h_low: 20
     hsv_yellow_s_low: 30
-    hsv_yellow_v_low: 65
+    hsv_yellow_v_low: 60
     hsv_yellow_h_high: 40
     hsv_yellow_s_high: 255
     hsv_yellow_v_high: 255
@@ -39,8 +39,8 @@ color_blob_detection:
     hsv_red1_v_high: 255
   
     hsv_red2_h_low: 160
-    hsv_red2_s_low: 60
-    hsv_red2_v_low: 100
+    hsv_red2_s_low: 70
+    hsv_red2_v_low: 45
     hsv_red2_h_high: 180
     hsv_red2_s_high: 255
     hsv_red2_v_high: 255
@@ -96,7 +96,7 @@ line_detection:
     gaussian_kernel_size: 5
     gaussian_sigma: 5
 
-    grayscale_threshold: 100
+    grayscale_threshold: 90
     morph_kernel_size: 3
     morph_erode_iterations: 40
     morph_dilate_iterations: 40
