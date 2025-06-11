@@ -22,7 +22,7 @@ class YoloV8Detection(Node):
         
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
-        self.declare_parameter('use_compressed', False)
+        self.declare_parameter('use_compressed', True)
 
         self.declare_parameter('model_name', 'puzzlebot_traffic_signs.pt')
         self.declare_parameter('confidence_threshold', 0.3)
@@ -132,8 +132,9 @@ class YoloV8Detection(Node):
             yolov8_inference.header.frame_id = "camera_frame"
             yolov8_inference.header.stamp = self.get_clock().now().to_msg()
             
-            # Process detection results
-            detection_count = 0
+            # Dictionary to store the highest confidence detection for each class
+            best_detections_by_class = {}
+            
             for r in results:
                 boxes = r.boxes
                 if boxes is not None:
@@ -141,23 +142,43 @@ class YoloV8Detection(Node):
                         # Get confidence score
                         conf = float(box.conf[0].to('cpu').detach().numpy())
                         
-                        # Only include detections above confidence threshold
+                        # Only consider detections above confidence threshold
                         if conf >= self.confidence_threshold:
-                            inference_result = InferenceResult()
-                            
                             # Get box coordinates and class
                             b = box.xyxy[0].to('cpu').detach().numpy().copy()
                             c = int(box.cls[0].to('cpu').detach().numpy())
+                            class_name = self.model.names[c]
                             
-                            # Fill the message
-                            inference_result.class_name = self.model.names[c]
-                            inference_result.left = int(b[0])
-                            inference_result.top = int(b[1])
-                            inference_result.right = int(b[2])
-                            inference_result.bottom = int(b[3])
-                            
-                            yolov8_inference.yolov8_inference.append(inference_result)
-                            detection_count += 1
+                            # Check if this is the most confident detection for this class
+                            if class_name not in best_detections_by_class or conf > best_detections_by_class[class_name]['confidence']:
+                                best_detections_by_class[class_name] = {
+                                    'coords': b,
+                                    'class_id': c,
+                                    'confidence': conf,
+                                    'class_name': class_name
+                                }
+            
+            # Add the best detection for each class to the inference result
+            detection_count = 0
+            for class_name, detection_data in best_detections_by_class.items():
+                inference_result = InferenceResult()
+                
+                # Fill the message with the best detection data for this class
+                inference_result.class_name = detection_data['class_name']
+                inference_result.left = int(detection_data['coords'][0])
+                inference_result.top = int(detection_data['coords'][1])
+                inference_result.right = int(detection_data['coords'][2])
+                inference_result.bottom = int(detection_data['coords'][3])
+                
+                yolov8_inference.yolov8_inference.append(inference_result)
+                detection_count += 1
+                
+                self.get_logger().debug(
+                    f"Best {class_name} detection: confidence {detection_data['confidence']:.2f}"
+                )
+            
+            if detection_count > 0:
+                self.get_logger().debug(f"Published {detection_count} best detections (one per class).")
             
             # Create annotated image and publish
             annotated_frame = results[0].plot()
@@ -167,9 +188,6 @@ class YoloV8Detection(Node):
             
             self.image_pub.publish(image_msg)
             self.yolov8_pub.publish(yolov8_inference)
-            
-            if detection_count > 0:
-                self.get_logger().debug(f"Detected {detection_count} objects.")
             
         except Exception as e:
             self.get_logger().error(f'Error in timer callback: {e}')

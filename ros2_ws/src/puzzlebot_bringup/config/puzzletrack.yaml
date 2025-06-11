@@ -1,7 +1,19 @@
+adaptive_image_filter:
+  ros__parameters:
+    image_topic: "image_raw"
+    use_compressed: True
+
+    sampling_interval: 5.0
+    adaptation_strength: 0.9
+
+    target_brightness: 50
+    target_contrast: 40
+    target_saturation: 30
+
 color_blob_detection:
   ros__parameters:
-    image_topic: 'image_raw'
-    use_compressed: False
+    image_topic: 'image_raw_filtered'
+    use_compressed: True
 
     update_rate: 60.0
     
@@ -55,8 +67,8 @@ color_blob_detection:
 
 yolov8_detection:
   ros__parameters:
-    image_topic: 'image_raw'
-    use_compressed: False
+    image_topic: 'image_raw_filtered'
+    use_compressed: True
     
     model_name: 'puzzlebot_traffic_signs.pt'
     confidence_threshold: 0.3
@@ -64,7 +76,7 @@ yolov8_detection:
 
 line_detection:
   ros__parameters:
-    image_topic: 'image_raw'
+    image_topic: 'image_raw_filtered'
     use_compressed: True
 
     update_rate: 60.0
@@ -84,7 +96,7 @@ line_detection:
     gaussian_kernel_size: 5
     gaussian_sigma: 5
 
-    grayscale_threshold: 95
+    grayscale_threshold: 60
     morph_kernel_size: 3
     morph_erode_iterations: 40
     morph_dilate_iterations: 40
@@ -108,3 +120,35 @@ line_follow_controller:
 
     velocity_scale_factor: 1.0
     steering_deadband: 0.03
+
+traffic_fsm:
+  ros__parameters:
+    update_rate: 30.0
+
+    detection_timeout: 1.0
+    full_speed_scale: 1.0
+
+    mid_speed_scale: 0.6
+    line_follow_controller_on_service: 'line_follow_controller/controller_on'
+    line_follow_controller_parameter_service: 'line_follow_controller/set_parameters'
+
+    searching_line_linear_speed: 0.09
+
+    min_turn_intersection_linear_speed: 0.08
+    max_turn_intersection_linear_speed: 0.17
+
+    min_turn_intersection_angular_speed: 0.5
+    max_turn_intersection_angular_speed: 1.5
+
+    turn_intersection_linear_speed: 0.09
+    turn_intersection_angular_speed: 1.1
+
+    turn_forward_distance: 0.35
+    turn_rotation_angle: 1.6
+
+    sign_ahead_class: 'fwd'
+    sign_right_class: 'right'
+    sign_left_class: 'left'
+    sign_roadwork_class: 'triUp'
+    sign_stop_class: 'stop'
+    sign_giveway_class: 'triDwn'

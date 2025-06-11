@@ -37,14 +37,14 @@ ACTION_SEARCHING_LINE = 6
 IDLE = 0
 EXECUTING = 1
 
-class TrafficSignFSM(Node):
+class TrafficFSM(Node):
     """
     Enhanced FSM with open-loop control for intersection handling.
     Combines the structure from the second code with the open-loop logic from the first.
     """
     
     def __init__(self):
-        super().__init__('traffic_sign_fsm')
+        super().__init__('traffic_fsm')
         
         # Declare parameters
         self.declare_parameter('update_rate', 30.0)
@@ -55,17 +55,18 @@ class TrafficSignFSM(Node):
         self.declare_parameter('mid_speed_scale', 0.6)
         
         # Controller service parameters
-        self.declare_parameter('controller_on_service', 'line_follow_controller/controller_on')
-        self.declare_parameter('controller_parameter_service', 'line_follow_controller/set_parameters')
+        self.declare_parameter('line_follow_controller_on_service', 'line_follow_controller/controller_on')
+        self.declare_parameter('line_follow_controller_parameter_service', 'line_follow_controller/set_parameters')
         
         # Searching line parameter
         self.declare_parameter('searching_line_linear_speed', 0.09)
         
         # Turn intersection speed limits
-        self.declare_parameter('min_turn_intersection_linear_speed', 0.01)
-        self.declare_parameter('max_turn_intersection_linear_speed', 2.0)
-        self.declare_parameter('min_turn_intersection_angular_speed', 0.01)
-        self.declare_parameter('max_turn_intersection_angular_speed', 2.0)
+        self.declare_parameter('min_turn_intersection_linear_speed', 0.08)
+        self.declare_parameter('max_turn_intersection_linear_speed', 0.17)
+
+        self.declare_parameter('min_turn_intersection_angular_speed', 0.5)
+        self.declare_parameter('max_turn_intersection_angular_speed', 1.5)
         
         # Turn intersection speeds
         self.declare_parameter('turn_intersection_linear_speed', 0.09)
@@ -86,17 +87,24 @@ class TrafficSignFSM(Node):
         # Retrieve parameters
         self.update_rate = self.get_parameter('update_rate').value
         self.detection_timeout = self.get_parameter('detection_timeout').value
+
         self.full_speed_scale = self.get_parameter('full_speed_scale').value
         self.mid_speed_scale = self.get_parameter('mid_speed_scale').value
-        self.controller_on_service = self.get_parameter('controller_on_service').value
-        self.controller_parameter_service = self.get_parameter('controller_parameter_service').value
+
+        self.line_follow_controller_on_service = self.get_parameter('line_follow_controller_on_service').value
+        self.line_follow_controller_parameter_service = self.get_parameter('line_follow_controller_parameter_service').value
+
         self.searching_line_linear_speed = self.get_parameter('searching_line_linear_speed').value
+
         self.min_turn_intersection_linear_speed = self.get_parameter('min_turn_intersection_linear_speed').value
         self.max_turn_intersection_linear_speed = self.get_parameter('max_turn_intersection_linear_speed').value
+
         self.min_turn_intersection_angular_speed = self.get_parameter('min_turn_intersection_angular_speed').value
         self.max_turn_intersection_angular_speed = self.get_parameter('max_turn_intersection_angular_speed').value
+
         self.turn_intersection_linear_speed = self.get_parameter('turn_intersection_linear_speed').value
         self.turn_intersection_angular_speed = self.get_parameter('turn_intersection_angular_speed').value
+        
         self.turn_forward_distance = self.get_parameter('turn_forward_distance').value
         self.turn_rotation_angle = self.get_parameter('turn_rotation_angle').value
         
@@ -191,14 +199,11 @@ class TrafficSignFSM(Node):
         
         # Service clients
         self.line_status_client = self.create_client(Trigger, 'line_detection/is_line_detected')
-        self.controller_on_client = self.create_client(SetBool, self.controller_on_service)
-        self.controller_param_client = self.create_client(SetParameters, self.controller_parameter_service)
+        self.controller_on_client = self.create_client(SetBool, self.line_follow_controller_on_service)
+        self.controller_param_client = self.create_client(SetParameters, self.line_follow_controller_parameter_service)
         
-        self.get_logger().info("TrafficSignFSM initialized with open-loop control.")
-        self.get_logger().info(f"Update rate: {self.update_rate} Hz")
-        self.get_logger().info(f"Turn parameters: {self.turn_forward_distance}m @ {self.turn_intersection_linear_speed}m/s, "
-                              f"{self.turn_rotation_angle}rad @ {self.turn_intersection_angular_speed}rad/s")
-    
+        self.get_logger().info("TrafficFSM Start.")
+
     def color_blob_callback(self, msg: ColorBlobDetection):
         """Process color blob detection with timeout."""
         color = msg.color
@@ -632,15 +637,15 @@ class TrafficSignFSM(Node):
                     self.sign_classes[param.value] = sign_type
                     self.get_logger().info(f"{param.name} updated: {param.value}")
                     
-            elif param.name in ['controller_on_service', 'controller_parameter_service']:
+            elif param.name in ['line_follow_controller_on_service', 'line_follow_controller_parameter_service']:
                 if not isinstance(param.value, str) or not param.value.strip():
                     return SetParametersResult(successful=False, reason=f"{param.name} must be a non-empty string.")
                 setattr(self, param.name, param.value)
                 # Recreate service clients
-                if param.name == 'controller_on_service':
-                    self.controller_on_client = self.create_client(SetBool, self.controller_on_service)
+                if param.name == 'line_follow_controller_on_service':
+                    self.controller_on_client = self.create_client(SetBool, self.line_follow_controller_on_service)
                 else:
-                    self.controller_param_client = self.create_client(SetParameters, self.controller_parameter_service)
+                    self.controller_param_client = self.create_client(SetParameters, self.line_follow_controller_parameter_service)
                 self.get_logger().info(f"{param.name} updated: {param.value}")
         
         return SetParametersResult(successful=True)
@@ -649,9 +654,9 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        node = TrafficSignFSM()
+        node = TrafficFSM()
     except Exception as e:
-        print(f"[FATAL] TrafficSignFSM failed to initialize: {e}", file=sys.stderr)
+        print(f"[FATAL] TrafficFSM failed to initialize: {e}", file=sys.stderr)
         rclpy.shutdown()
         return
     

@@ -29,7 +29,7 @@ class ColorBlobDetectionNode(Node):
 
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
-        self.declare_parameter('use_compressed', False)
+        self.declare_parameter('use_compressed', True)
 
         self.declare_parameter('update_rate', 60.0)    # Hz
 
