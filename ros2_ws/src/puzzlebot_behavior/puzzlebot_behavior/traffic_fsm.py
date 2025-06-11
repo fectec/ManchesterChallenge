@@ -38,11 +38,6 @@ IDLE = 0
 EXECUTING = 1
 
 class TrafficFSM(Node):
-    """
-    Enhanced FSM with open-loop control for intersection handling.
-    Combines the structure from the second code with the open-loop logic from the first.
-    """
-    
     def __init__(self):
         super().__init__('traffic_fsm')
         
@@ -76,6 +71,9 @@ class TrafficFSM(Node):
         self.declare_parameter('turn_forward_distance', 0.35)
         self.declare_parameter('turn_rotation_angle', 1.6)
         
+        # Stop sign area threshold parameter
+        self.declare_parameter('stop_sign_area_threshold', 8000.0)  
+        
         # Sign class parameters
         self.declare_parameter('sign_ahead_class', 'fwd')
         self.declare_parameter('sign_right_class', 'right')
@@ -108,6 +106,8 @@ class TrafficFSM(Node):
         self.turn_forward_distance = self.get_parameter('turn_forward_distance').value
         self.turn_rotation_angle = self.get_parameter('turn_rotation_angle').value
         
+        self.stop_sign_area_threshold = self.get_parameter('stop_sign_area_threshold').value
+        
         # Sign class mapping
         self.sign_classes = {
             self.get_parameter('sign_ahead_class').value: SIGN_AHEAD_ONLY,
@@ -135,6 +135,7 @@ class TrafficFSM(Node):
             Parameter('turn_intersection_angular_speed', Parameter.Type.DOUBLE, self.turn_intersection_angular_speed),
             Parameter('turn_forward_distance', Parameter.Type.DOUBLE, self.turn_forward_distance),
             Parameter('turn_rotation_angle', Parameter.Type.DOUBLE, self.turn_rotation_angle),
+            Parameter('stop_sign_area_threshold', Parameter.Type.DOUBLE, self.stop_sign_area_threshold),
         ]
         
         result = self.parameter_callback(init_params)
@@ -150,6 +151,10 @@ class TrafficFSM(Node):
         self.current_sign = SIGN_NONE
         self.last_sign = SIGN_NONE
         self.last_directional_sign = SIGN_NONE
+        
+        # Stop sign area tracking
+        self.stop_sign_area = 0.0
+        self.stop_sign_close = False
         
         # Detection timeouts
         self.light_lost_time = None
@@ -216,17 +221,42 @@ class TrafficFSM(Node):
             self.current_light = ColorBlobDetection.COLOR_NONE
     
     def sign_detection_callback(self, msg: Yolov8Inference):
-        """Process YOLO sign detection with timeout."""
+        """Process YOLO sign detection with timeout and area calculation for stop signs."""
         best_sign = SIGN_NONE
         max_area = 0
+        stop_sign_detected = False
+        current_stop_area = 0.0
         
         for inference in msg.yolov8_inference:
             detected_sign = self.sign_classes.get(inference.class_name, SIGN_NONE)
             if detected_sign != SIGN_NONE:
                 area = (inference.bottom - inference.top) * (inference.right - inference.left)
+                
+                # Special handling for stop sign
+                if detected_sign == SIGN_STOP:
+                    stop_sign_detected = True
+                    current_stop_area = max(current_stop_area, area)
+                    
+                    # Check if stop sign is close enough
+                    if area > self.stop_sign_area_threshold:
+                        self.stop_sign_close = True
+                        self.get_logger().info(f"Stop sign close! Area: {area:.1f} > threshold: {self.stop_sign_area_threshold:.1f}.")
+                    else:
+                        self.stop_sign_close = False
+                        self.get_logger().debug(f"Stop sign detected but far. Area: {area:.1f}", throttle_duration_sec=1.0)
+                
+                # Track the largest sign for general sign detection
                 if area > max_area:
                     max_area = area
                     best_sign = detected_sign
+        
+        # Update stop sign area
+        self.stop_sign_area = current_stop_area
+        
+        # If no stop sign detected, reset close flag
+        if not stop_sign_detected:
+            self.stop_sign_close = False
+            self.stop_sign_area = 0.0
         
         # Update sign with timeout
         if best_sign != SIGN_NONE:
@@ -244,6 +274,8 @@ class TrafficFSM(Node):
                 if self.current_sign in [SIGN_AHEAD_ONLY, SIGN_TURN_RIGHT_AHEAD, SIGN_TURN_LEFT_AHEAD]:
                     self.last_directional_sign = self.current_sign
             self.current_sign = SIGN_NONE
+            self.stop_sign_close = False
+            self.stop_sign_area = 0.0
     
     def check_line_status_async(self):
         """Asynchronously check line detection status."""
@@ -316,12 +348,17 @@ class TrafficFSM(Node):
         # Log current state
         self.get_logger().debug(
             f"State: Line={line_detected}, Light={self._light_name(self.current_light)}, "
-            f"Sign={self._sign_name(self.current_sign)}, LastDir={self._sign_name(self.last_directional_sign)}",
+            f"Sign={self._sign_name(self.current_sign)}, LastDir={self._sign_name(self.last_directional_sign)}, "
+            f"StopClose={self.stop_sign_close}",
             throttle_duration_sec=1.0
         )
         
-        # Stop sign or red light - highest priority
-        if self.current_sign == SIGN_STOP or self.current_light == ColorBlobDetection.COLOR_RED:
+        # Stop sign (only if close) - highest priority
+        if self.current_sign == SIGN_STOP and self.stop_sign_close:
+            return ACTION_ZERO_SPEED
+        
+        # Red light - but ONLY if no stop sign is detected
+        if self.current_light == ColorBlobDetection.COLOR_RED and self.current_sign != SIGN_STOP:
             return ACTION_ZERO_SPEED
         
         # Check for intersection start: no line + green light + directional sign
@@ -573,6 +610,12 @@ class TrafficFSM(Node):
                 if not isinstance(param.value, (int, float)) or param.value <= 0.0:
                     return SetParametersResult(successful=False, reason="searching_line_linear_speed must be > 0.")
                 self.searching_line_linear_speed = float(param.value)
+                
+            elif param.name == 'stop_sign_area_threshold':
+                if not isinstance(param.value, (int, float)) or param.value <= 0.0:
+                    return SetParametersResult(successful=False, reason="stop_sign_area_threshold must be > 0.")
+                self.stop_sign_area_threshold = float(param.value)
+                self.get_logger().info(f"Stop sign area threshold updated to {self.stop_sign_area_threshold}")
                 
             elif param.name == 'turn_intersection_linear_speed':
                 if not isinstance(param.value, (int, float)):

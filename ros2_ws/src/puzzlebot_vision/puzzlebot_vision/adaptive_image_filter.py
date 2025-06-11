@@ -23,13 +23,13 @@ class AdaptiveImageFilter(Node):
         self.declare_parameter('image_topic', 'image_raw')
         self.declare_parameter('use_compressed', True)
 
-        self.declare_parameter('sampling_interval', 5.0)    # s
-        self.declare_parameter('adaptation_strength', 0.7)  # 0-1
+        self.declare_parameter('sampling_interval', 2.0)    # s
+        self.declare_parameter('adaptation_strength', 1.0)  # 0-1
         
         # Target values for normalization
-        self.declare_parameter('target_brightness', 128)
-        self.declare_parameter('target_contrast', 50)
-        self.declare_parameter('target_saturation', 60)
+        self.declare_parameter('target_brightness', 40)
+        self.declare_parameter('target_contrast', 40)
+        self.declare_parameter('target_saturation', 30)
         
         # Get parameters
         self.image_topic = self.get_parameter('image_topic').value

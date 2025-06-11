@@ -44,10 +44,10 @@ class LineDectection(Node):
         self.declare_parameter('gaussian_sigma', 5)
         
         # Thresholding and morphology parameters
-        self.declare_parameter('grayscale_threshold', 95)
+        self.declare_parameter('grayscale_threshold', 70)
         self.declare_parameter('morph_kernel_size', 3)
         self.declare_parameter('morph_erode_iterations', 40)
-        self.declare_parameter('morph_dilate_iterations', 90)
+        self.declare_parameter('morph_dilate_iterations', 40)
         
         # Centroid calculation parameters
         self.declare_parameter('min_contour_area', 180)

@@ -3,10 +3,10 @@ adaptive_image_filter:
     image_topic: "image_raw"
     use_compressed: True
 
-    sampling_interval: 5.0
-    adaptation_strength: 0.9
+    sampling_interval: 2.0
+    adaptation_strength: 1.0
 
-    target_brightness: 50
+    target_brightness: 40
     target_contrast: 40
     target_saturation: 30
 
@@ -96,7 +96,7 @@ line_detection:
     gaussian_kernel_size: 5
     gaussian_sigma: 5
 
-    grayscale_threshold: 60
+    grayscale_threshold: 70
     morph_kernel_size: 3
     morph_erode_iterations: 40
     morph_dilate_iterations: 40
@@ -145,6 +145,8 @@ traffic_fsm:
 
     turn_forward_distance: 0.35
     turn_rotation_angle: 1.6
+
+    stop_sign_area_threshold: 8000.0
 
     sign_ahead_class: 'fwd'
     sign_right_class: 'right'
