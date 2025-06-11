@@ -22,7 +22,7 @@ class YoloV8Detection(Node):
         
         # Declare parameters
         self.declare_parameter('image_topic', 'image_raw')
-        self.declare_parameter('use_compressed', True)
+        self.declare_parameter('use_compressed', False)
 
         self.declare_parameter('model_name', 'puzzlebot_traffic_signs.pt')
         self.declare_parameter('confidence_threshold', 0.3)
@@ -180,8 +180,50 @@ class YoloV8Detection(Node):
             if detection_count > 0:
                 self.get_logger().debug(f"Published {detection_count} best detections (one per class).")
             
-            # Create annotated image and publish
-            annotated_frame = results[0].plot()
+            # Create custom annotated image with only the strongest detections
+            annotated_frame = self.image.copy()
+            
+            # Define colors for different classes (BGR format)
+            class_colors = {
+                'fwd': (0, 255, 0),      # Green - Go ahead
+                'right': (0, 0, 255),    # Red - Turn right
+                'left': (255, 0, 0),     # Blue - Turn left  
+                'triUp': (0, 165, 255),  # Orange - Road work warning
+                'stop': (0, 0, 128),     # Dark Red - Stop sign
+                'triDwn': (0, 255, 255)  # Yellow - Give way
+            }
+            
+            # Draw only the best detections
+            for class_name, detection_data in best_detections_by_class.items():
+                coords = detection_data['coords']
+                confidence = detection_data['confidence']
+                
+                # Get color for this class (default to green if class not in dictionary)
+                color = class_colors.get(class_name, (0, 255, 0))
+                
+                # Draw bounding box with thinner line
+                cv2.rectangle(annotated_frame, 
+                            (int(coords[0]), int(coords[1])), 
+                            (int(coords[2]), int(coords[3])), 
+                            color, 1)
+                
+                # Draw label with confidence (smaller font)
+                label = f"{class_name} {confidence:.2f}"
+                font_scale = 0.4
+                thickness = 1
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+                
+                # Draw smaller label background
+                cv2.rectangle(annotated_frame,
+                            (int(coords[0]), int(coords[1]) - label_size[1] - 6),
+                            (int(coords[0]) + label_size[0] + 4, int(coords[1])),
+                            color, -1)
+                
+                # Draw label text
+                cv2.putText(annotated_frame, label,
+                          (int(coords[0]) + 2, int(coords[1]) - 3),
+                          cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+            
             image_msg = self.bridge.cv2_to_imgmsg(annotated_frame, encoding='bgr8')
             image_msg.header.stamp = self.get_clock().now().to_msg()
             image_msg.header.frame_id = "camera_frame"
